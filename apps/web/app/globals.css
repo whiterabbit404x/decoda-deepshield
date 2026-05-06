@@ -76,3 +76,26 @@ body {
   .sidebar { border-right: 0; border-bottom: 1px solid var(--border); }
   .nav-list { grid-template-columns: repeat(3, minmax(0,1fr)); }
 }
+
+.state-text { margin-top: .8rem; color: var(--muted); font-size: .88rem; }
+.state-error { color: #ff9ca6; }
+.analyze-input {
+  margin-top: .8rem;
+  width: 100%;
+  min-height: 96px;
+  background: #0a1324;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: .7rem .8rem;
+  resize: vertical;
+}
+.upload-btn.secondary {
+  margin-top: .6rem;
+  background: transparent;
+  border: 1px solid rgba(54,215,255,.4);
+}
+.upload-btn:disabled {
+  cursor: not-allowed;
+  opacity: .6;
+}

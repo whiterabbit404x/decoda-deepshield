@@ -1,21 +1,28 @@
-const alerts = [
-  { title: "Critical CVE exploit attempt", level: "Critical" },
-  { title: "Unmanaged endpoint detected", level: "High" },
-  { title: "DNS tunneling anomaly", level: "Medium" }
-];
+import { type Alert } from "@/types/api";
 
-export function AlertsList() {
+interface AlertsListProps {
+  alerts: Alert[];
+  error?: string;
+  loading?: boolean;
+}
+
+export function AlertsList({ alerts, error, loading }: AlertsListProps) {
   return (
     <article className="card alerts-card">
       <h3>Active Alerts</h3>
-      <ul>
-        {alerts.map((alert) => (
-          <li key={alert.title}>
-            <span>{alert.title}</span>
-            <strong>{alert.level}</strong>
-          </li>
-        ))}
-      </ul>
+      {loading ? <p className="state-text">Loading alerts…</p> : null}
+      {error ? <p className="state-text state-error">{error}</p> : null}
+      {!loading && !error && alerts.length === 0 ? <p className="state-text">No active alerts.</p> : null}
+      {!loading && !error && alerts.length > 0 ? (
+        <ul>
+          {alerts.map((alert) => (
+            <li key={alert.id}>
+              <span>{alert.title}</span>
+              <strong>{alert.level}</strong>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </article>
   );
 }
