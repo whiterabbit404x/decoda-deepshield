@@ -1,11 +1,19 @@
-const stats = [
-  { label: "Threats Blocked", value: "12,849", delta: "+12.4%" },
-  { label: "Active Incidents", value: "17", delta: "-8.1%" },
-  { label: "Risk Score", value: "34 / 100", delta: "-3.2%" },
-  { label: "Endpoints Online", value: "2,431", delta: "+1.6%" }
-];
+import { type Alert, type HealthResponse, type Incident } from "@/types/api";
 
-export function StatCards() {
+interface StatCardsProps {
+  health?: HealthResponse | null;
+  alerts: Alert[];
+  incidents: Incident[];
+}
+
+export function StatCards({ health, alerts, incidents }: StatCardsProps) {
+  const stats = [
+    { label: "Threats Blocked", value: `${alerts.length}`, delta: "Live" },
+    { label: "Active Incidents", value: `${incidents.length}`, delta: incidents.length > 0 ? "Needs triage" : "Stable" },
+    { label: "API Status", value: health?.status ?? "Offline", delta: health?.service ?? "Connectivity issue" },
+    { label: "Last Sync", value: health?.timestamp ? new Date(health.timestamp).toLocaleTimeString() : "Unavailable", delta: "No cache" }
+  ];
+
   return (
     <section className="stats-grid">
       {stats.map((stat) => (

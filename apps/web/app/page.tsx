@@ -1,26 +1,31 @@
-import { AlertsList } from "@/components/dashboard/AlertsList";
-import { ChartPanel } from "@/components/dashboard/ChartPanel";
-import { DataTables } from "@/components/dashboard/DataTables";
-import { StatCards } from "@/components/dashboard/StatCards";
-import { UploadPanel } from "@/components/dashboard/UploadPanel";
+import { DashboardClient } from "@/components/dashboard/DashboardClient";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
+import { getAlerts, getHealth, getIncidents } from "@/lib/api";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const [healthResult, alertsResult, incidentsResult] = await Promise.allSettled([
+    getHealth(),
+    getAlerts(),
+    getIncidents()
+  ]);
+
+  const health = healthResult.status === "fulfilled" ? healthResult.value : null;
+  const alerts = alertsResult.status === "fulfilled" ? alertsResult.value : [];
+  const incidents = incidentsResult.status === "fulfilled" ? incidentsResult.value : [];
+
   return (
     <main className="app-shell">
       <Sidebar />
       <section className="content">
         <Topbar />
-        <StatCards />
-        <section className="middle-grid">
-          <ChartPanel />
-          <UploadPanel />
-        </section>
-        <section className="lower-grid">
-          <DataTables />
-          <AlertsList />
-        </section>
+        <DashboardClient
+          health={health}
+          alerts={alerts}
+          incidents={incidents}
+          alertsError={alertsResult.status === "rejected" ? alertsResult.reason?.message : undefined}
+          incidentsError={incidentsResult.status === "rejected" ? incidentsResult.reason?.message : undefined}
+        />
         <footer className="footer card">
           <div className="footer-links">
             <a href="#">Documentation</a>
