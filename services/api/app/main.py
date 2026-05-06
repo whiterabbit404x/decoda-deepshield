@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
+import uvicorn
 from fastapi import FastAPI, HTTPException
 
 from .detection import analyze_evidence
@@ -35,16 +37,25 @@ def run_detection(payload: DetectionRequest) -> dict:
         alert = store.create_alert(
             AlertRecord(
                 evidence_id=detection.evidence_id,
-                risk_level=detection.risk_level,
+                severity=detection.risk_level,
                 synthetic_risk_score=detection.synthetic_risk_score,
+                reason_codes=detection.reason_codes,
+                recommended_action=detection.recommended_action,
             )
         )
         store.create_incident(
             IncidentRecord(
                 alert_id=alert.alert_id,
                 evidence_id=detection.evidence_id,
-                severity=detection.risk_level,
-                title=f"Synthetic identity risk: {detection.risk_level}",
+                priority="high" if detection.risk_level == "high" else "medium",
+                summary=(
+                    f"{detection.risk_level.title()} synthetic-risk evidence requires analyst review"
+                ),
+                audit_trail=[
+                    "detection_result_generated",
+                    "alert_auto_created",
+                    "incident_auto_opened",
+                ],
             )
         )
 
@@ -67,3 +78,7 @@ def export_evidence(evidence_id: str) -> dict:
         return store.export_evidence_package(evidence_id)
     except KeyError:
         raise HTTPException(status_code=404, detail="evidence not found")
+
+
+if __name__ == "__main__":
+    uvicorn.run("app.main:app", host="0.0.0.0", port=int(os.getenv("PORT", "8000")))

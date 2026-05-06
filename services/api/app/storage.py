@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Dict, List
 
-from .schemas import AlertRecord, DetectionResult, EvidenceRecord, IncidentRecord
+from .schemas import MVP_DISCLAIMER, AlertRecord, DetectionResult, EvidenceRecord, IncidentRecord, utcnow_iso
 
 
 class JsonStore:
@@ -71,13 +71,15 @@ class JsonStore:
         if not evidence:
             raise KeyError(evidence_id)
 
-        detections = [d for d in self._read("detections") if d["evidence_id"] == evidence_id]
-        alerts = [a for a in self._read("alerts") if a["evidence_id"] == evidence_id]
-        incidents = [i for i in self._read("incidents") if i["evidence_id"] == evidence_id]
+        detection = next((d for d in reversed(self._read("detections")) if d["evidence_id"] == evidence_id), None)
+        alert = next((a for a in reversed(self._read("alerts")) if a["evidence_id"] == evidence_id), None)
+        incident = next((i for i in reversed(self._read("incidents")) if i["evidence_id"] == evidence_id), None)
 
         return {
-            "evidence": evidence.model_dump(),
-            "detections": detections,
-            "alerts": alerts,
-            "incidents": incidents,
+            "evidence_id": evidence_id,
+            "detection_result": detection,
+            "related_alert": alert,
+            "related_incident": incident,
+            "generated_at": utcnow_iso(),
+            "disclaimer": MVP_DISCLAIMER,
         }

@@ -16,32 +16,86 @@ def reset_data() -> None:
         (data_dir / f"{name}.json").write_text("[]", encoding="utf-8")
 
 
+def _upload_and_analyze_until_level(levels: set[str]) -> tuple[dict, dict]:
+    for idx in range(250):
+        upload = client.post("/evidence/upload", json={"filename": f"sample-{idx}.mp4"}).json()
+        analysis = client.post("/detections/analyze", json={"evidence_id": upload["evidence_id"]})
+        assert analysis.status_code == 200
+        payload = analysis.json()
+        if payload["risk_level"] in levels:
+            return upload, payload
+    raise AssertionError(f"Could not produce risk level in {levels}")
+
+
 def test_health() -> None:
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json()["status"] == "ok"
+    assert response.json() == {"status": "ok", "service": "deepshield-api"}
 
 
-def test_detection_alert_and_incident_creation() -> None:
+def test_upload_analyze_alert_incident_and_lists() -> None:
     reset_data()
-    upload = client.post("/evidence/upload", json={"filename": "sample.mp4"}).json()
-    analyze = client.post("/detections/analyze", json={"evidence_id": upload["evidence_id"]})
-    assert analyze.status_code == 200
-    payload = analyze.json()
-    assert 0 <= payload["synthetic_risk_score"] <= 100
-    assert payload["risk_level"] in ["low", "medium", "high"]
+    upload, detection = _upload_and_analyze_until_level({"medium", "high"})
 
-    alerts = client.get("/alerts").json()
-    incidents = client.get("/incidents").json()
-    if payload["risk_level"] in ["medium", "high"]:
-        assert len(alerts) == 1
-        assert len(incidents) == 1
-    else:
-        assert len(alerts) == 0
-        assert len(incidents) == 0
+    assert upload["evidence_id"]
+    assert "uploaded_at" in upload
+
+    for key in [
+        "evidence_id",
+        "synthetic_risk_score",
+        "risk_level",
+        "reason_codes",
+        "recommended_action",
+        "created_at",
+        "decision_support_disclaimer",
+    ]:
+        assert key in detection
+
+    alerts = client.get("/alerts")
+    incidents = client.get("/incidents")
+    assert alerts.status_code == 200
+    assert incidents.status_code == 200
+
+    alerts_payload = alerts.json()
+    incidents_payload = incidents.json()
+    assert len(alerts_payload) == 1
+    assert len(incidents_payload) == 1
+
+    alert = alerts_payload[0]
+    for key in [
+        "alert_id",
+        "evidence_id",
+        "severity",
+        "synthetic_risk_score",
+        "reason_codes",
+        "recommended_action",
+        "created_at",
+        "status",
+    ]:
+        assert key in alert
+
+    incident = incidents_payload[0]
+    for key in [
+        "incident_id",
+        "alert_id",
+        "evidence_id",
+        "status",
+        "priority",
+        "summary",
+        "created_at",
+        "audit_trail",
+    ]:
+        assert key in incident
 
 
-def test_evidence_export() -> None:
+def test_low_risk_does_not_create_alert_or_incident() -> None:
+    reset_data()
+    _upload_and_analyze_until_level({"low"})
+    assert client.get("/alerts").json() == []
+    assert client.get("/incidents").json() == []
+
+
+def test_evidence_export_package_shape() -> None:
     reset_data()
     upload = client.post("/evidence/upload", json={"filename": "proof.wav"}).json()
     client.post("/detections/analyze", json={"evidence_id": upload["evidence_id"]})
@@ -49,5 +103,15 @@ def test_evidence_export() -> None:
     exported = client.get(f"/evidence/{upload['evidence_id']}/export")
     assert exported.status_code == 200
     body = exported.json()
-    assert body["evidence"]["evidence_id"] == upload["evidence_id"]
-    assert len(body["detections"]) == 1
+
+    for key in [
+        "evidence_id",
+        "detection_result",
+        "related_alert",
+        "related_incident",
+        "generated_at",
+        "disclaimer",
+    ]:
+        assert key in body
+    assert body["evidence_id"] == upload["evidence_id"]
+    assert body["detection_result"]["evidence_id"] == upload["evidence_id"]

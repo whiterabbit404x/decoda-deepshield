@@ -10,6 +10,13 @@ from pydantic import BaseModel, Field
 RiskLevel = Literal["low", "medium", "high"]
 
 
+MVP_DISCLAIMER = (
+    "DeepShield MVP provides deterministic decision-support only. "
+    "It does not perform real biometric identification, face recognition matching, "
+    "or production fraud adjudication."
+)
+
+
 def utcnow_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -39,13 +46,16 @@ class DetectionResult(BaseModel):
     reason_codes: List[str]
     recommended_action: str
     created_at: str = Field(default_factory=utcnow_iso)
+    decision_support_disclaimer: str = MVP_DISCLAIMER
 
 
 class AlertRecord(BaseModel):
     alert_id: str = Field(default_factory=lambda: str(uuid4()))
     evidence_id: str
-    risk_level: RiskLevel
+    severity: RiskLevel
     synthetic_risk_score: int
+    reason_codes: List[str]
+    recommended_action: str
     status: Literal["open", "closed"] = "open"
     created_at: str = Field(default_factory=utcnow_iso)
 
@@ -54,7 +64,8 @@ class IncidentRecord(BaseModel):
     incident_id: str = Field(default_factory=lambda: str(uuid4()))
     alert_id: str
     evidence_id: str
-    severity: RiskLevel
-    title: str
     status: Literal["open", "investigating", "resolved"] = "open"
+    priority: Literal["medium", "high"] = "medium"
+    summary: str
     created_at: str = Field(default_factory=utcnow_iso)
+    audit_trail: List[str] = Field(default_factory=list)
