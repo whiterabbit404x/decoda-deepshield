@@ -1,7 +1,9 @@
 export function Topbar() {
   return (
     <header className="topbar card">
+      <label htmlFor="global-search" className="sr-only">Search detections</label>
       <input
+        id="global-search"
         className="search"
         placeholder="Search detections, indicators, incidents..."
         aria-label="Search"

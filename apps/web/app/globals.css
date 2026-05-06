@@ -99,3 +99,19 @@ body {
   cursor: not-allowed;
   opacity: .6;
 }
+
+.toolbar-row { display:flex; gap:.7rem; align-items:center; }
+.period-filter { background:#0a1324; color:var(--text); border:1px solid var(--border); border-radius:8px; padding:.45rem .6rem; }
+.refresh-btn { width:auto; margin-top:0; padding:.55rem .9rem; }
+.chart-wrap { min-height:250px; }
+.drop-zone { margin-top:.8rem; border:1px dashed #4773c6; border-radius:10px; padding:1rem; text-align:center; background:rgba(13,24,43,.5); }
+.drag-active { border-color:#63d6ff; background:rgba(54,215,255,.12); }
+.progress { margin-top:.7rem; background:#14243f; border-radius:999px; height:8px; overflow:hidden; }
+.progress span { display:block; height:100%; background:linear-gradient(90deg,#2bc4ea,#4e78ff); }
+.badge { display:inline-block; border-radius:999px; font-size:.72rem; padding:.2rem .5rem; border:1px solid transparent; text-transform:capitalize; }
+.sev-high,.pri-high,.pri-critical { color:#ffd4d9; background:#4d1d2a; border-color:#ff6b7e; }
+.sev-medium,.pri-medium { color:#ffe8b6; background:#4d3920; border-color:#f5c15f; }
+.sev-low,.pri-low { color:#b8f0ff; background:#153848; border-color:#57d5ff; }
+.link-btn { margin-left:.4rem; background:none; border:none; color:#8fdfff; text-decoration:underline; cursor:pointer; }
+.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline:2px solid #8fdfff; outline-offset:2px; }

@@ -2,7 +2,7 @@ const nav = ["Overview", "Threat Feed", "Incidents", "Endpoints", "Policies", "I
 
 export function Sidebar() {
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" aria-label="Primary navigation">
       <div className="brand">
         <span className="brand-glow" />
         <div>
@@ -10,7 +10,7 @@ export function Sidebar() {
           <p className="brand-subtitle">Enterprise SOC</p>
         </div>
       </div>
-      <nav className="nav-list">
+      <nav className="nav-list" aria-label="Security sections">
         {nav.map((item, i) => (
           <button key={item} className={`nav-item ${i === 0 ? "active" : ""}`}>
             {item}

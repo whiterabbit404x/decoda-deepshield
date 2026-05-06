@@ -4,21 +4,25 @@ interface DataTablesProps {
   detections: DetectionOutput[];
   incidents: Incident[];
   incidentsError?: string;
+  onRetryIncidents: () => void;
 }
 
-export function DataTables({ detections, incidents, incidentsError }: DataTablesProps) {
+const truncate = (text: string, n = 72) => (text.length > n ? `${text.slice(0, n - 1)}…` : text);
+
+export function DataTables({ detections, incidents, incidentsError, onRetryIncidents }: DataTablesProps) {
   return (
     <section className="tables-grid">
       <article className="card table-card">
         <h3>Recent Detections</h3>
-        {detections.length === 0 ? <p className="state-text">No detections analyzed yet.</p> : null}
-        {detections.length > 0 ? <ul>{detections.map((d) => <li key={d.id ?? d.label}>{d.label}</li>)}</ul> : null}
+        {detections.length === 0 ? <p className="state-text">No detections analyzed yet.</p> : (
+          <ul>{detections.map((d) => <li key={d.id ?? d.label}><strong>{d.label}</strong><p className="muted">{truncate(d.details ?? "No summary provided.")}</p></li>)}</ul>
+        )}
       </article>
       <article className="card table-card">
         <h3>Incidents</h3>
-        {incidentsError ? <p className="state-text state-error">{incidentsError}</p> : null}
+        {incidentsError ? <p className="state-text state-error">{incidentsError} <button className="link-btn" onClick={onRetryIncidents}>Reload panel</button></p> : null}
         {!incidentsError && incidents.length === 0 ? <p className="state-text">No incidents found.</p> : null}
-        {!incidentsError && incidents.length > 0 ? <ul>{incidents.map((i) => <li key={i.id}>{`${i.id}  ${i.title}`}</li>)}</ul> : null}
+        {!incidentsError && incidents.length > 0 ? <ul>{incidents.map((i) => <li key={i.id}><div><span className={`badge sev-${(i.severity ?? "low").toLowerCase()}`}>{i.severity ?? "low"}</span> <strong>{i.title}</strong></div><p className="muted">{truncate(i.status ?? "Awaiting triage")}</p><small>{i.created_at ? new Date(i.created_at).toLocaleString() : "No timestamp"}</small></li>)}</ul> : null}
       </article>
     </section>
   );
