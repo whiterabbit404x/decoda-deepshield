@@ -14,6 +14,18 @@ python -m app.main
 
 The app binds to `0.0.0.0` and uses `$PORT` (default `8000`) for Railway compatibility.
 
+
+## Initial schema creation
+
+This service currently uses SQLAlchemy metadata bootstrap (instead of Alembic) for initial schema creation.
+
+```bash
+cd services/api
+python -m app.db.bootstrap
+```
+
+The command creates all model tables (Organization, User, Workspace, Evidence, Detection, Alert, Incident, AuditEvent) and constraints from `Base.metadata`.
+
 ## Test
 
 ```bash

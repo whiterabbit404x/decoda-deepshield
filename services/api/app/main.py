@@ -20,13 +20,22 @@ def startup() -> None:
     Base.metadata.create_all(bind=engine)
     db = next(get_db())
     try:
-        if not db.query(Organization).filter(Organization.organization_id == "default-org").first():
-            db.add(Organization(organization_id="default-org", name="Default Organization"))
-        if not db.query(Workspace).filter(Workspace.workspace_id == "default-workspace").first():
+        if not db.query(Organization).filter(
+            Organization.organization_id == DBRepository.DEFAULT_ORGANIZATION_ID
+        ).first():
+            db.add(
+                Organization(
+                    organization_id=DBRepository.DEFAULT_ORGANIZATION_ID,
+                    name="Default Organization",
+                )
+            )
+        if not db.query(Workspace).filter(
+            Workspace.workspace_id == DBRepository.DEFAULT_WORKSPACE_ID
+        ).first():
             db.add(
                 Workspace(
-                    workspace_id="default-workspace",
-                    organization_id="default-org",
+                    workspace_id=DBRepository.DEFAULT_WORKSPACE_ID,
+                    organization_id=DBRepository.DEFAULT_ORGANIZATION_ID,
                     name="Default Workspace",
                 )
             )
