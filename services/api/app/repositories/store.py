@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Alert, AuditEvent, Detection, Evidence, Incident
 from app.schemas import MVP_DISCLAIMER, AlertRecord, DetectionResult, EvidenceRecord, IncidentRecord, utcnow_iso
+from app.detection import SIMULATED_MODEL_VERSION
 
 
 class DBRepository:
@@ -104,6 +105,7 @@ class DBRepository:
             recommended_action=detection.recommended_action,
             created_at=self._iso(detection.created_at),
             decision_support_disclaimer=MVP_DISCLAIMER,
+            simulated_model_version=SIMULATED_MODEL_VERSION,
         )
 
     def create_alert(self, alert: AlertRecord) -> AlertRecord:
@@ -263,6 +265,8 @@ class DBRepository:
                     reason_codes=detection.reason_codes,
                     recommended_action=detection.recommended_action,
                     created_at=self._iso(detection.created_at),
+                    decision_support_disclaimer=MVP_DISCLAIMER,
+                    simulated_model_version=SIMULATED_MODEL_VERSION,
                 ).model_dump()
                 if detection
                 else None

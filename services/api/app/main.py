@@ -57,7 +57,7 @@ def runtime_status(db: Session = Depends(get_db)) -> dict:
         return value.isoformat() if value else None
 
     status = {
-        "api_status": "healthy",
+        "api_status": "ok",
         "database_status": "degraded",
         "evidence_count": 0,
         "detection_count": 0,
@@ -65,12 +65,15 @@ def runtime_status(db: Session = Depends(get_db)) -> dict:
         "incident_count": 0,
         "last_evidence_at": None,
         "last_detection_at": None,
+        "last_alert_at": None,
+        "last_incident_at": None,
         "last_sync_at": None,
+        "mode": "simulated_decision_support",
     }
 
     try:
         db.execute(text("SELECT 1"))
-        status["database_status"] = "healthy"
+        status["database_status"] = "ok"
 
         status["evidence_count"] = db.query(Evidence).count()
         status["detection_count"] = db.query(Detection).count()
@@ -84,11 +87,12 @@ def runtime_status(db: Session = Depends(get_db)) -> dict:
 
         status["last_evidence_at"] = _isoformat(latest_evidence)
         status["last_detection_at"] = _isoformat(latest_detection)
+        status["last_alert_at"] = _isoformat(latest_alert)
+        status["last_incident_at"] = _isoformat(latest_incident)
 
         sync_candidates = [latest_evidence, latest_detection, latest_alert, latest_incident]
         status["last_sync_at"] = _isoformat(max((ts for ts in sync_candidates if ts is not None), default=None))
     except SQLAlchemyError:
-        # Keep endpoint payload shape stable for client polling loops.
         status["api_status"] = "degraded"
 
     return status
