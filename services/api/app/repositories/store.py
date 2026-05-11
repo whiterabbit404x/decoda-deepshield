@@ -10,6 +10,8 @@ from app.schemas import MVP_DISCLAIMER, AlertRecord, DetectionResult, EvidenceRe
 
 
 class DBRepository:
+    DEFAULT_ORGANIZATION_ID = "00000000-0000-0000-0000-000000000001"
+    DEFAULT_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001"
     def __init__(self, db: Session):
         self.db = db
 
@@ -20,8 +22,8 @@ class DBRepository:
     def create_evidence(self, record: EvidenceRecord) -> EvidenceRecord:
         evidence = Evidence(
             evidence_id=record.evidence_id,
-            organization_id="default-org",
-            workspace_id="default-workspace",
+            organization_id=self.DEFAULT_ORGANIZATION_ID,
+            workspace_id=self.DEFAULT_WORKSPACE_ID,
             filename=record.filename,
             content_type=record.content_type,
             source=record.source,
@@ -34,7 +36,7 @@ class DBRepository:
             filename=evidence.filename,
             content_type=evidence.content_type,
             source=evidence.source,
-            uploaded_at=self._iso(evidence.uploaded_at),
+            uploaded_at=self._iso(evidence.created_at),
         )
 
     def get_evidence(self, evidence_id: str) -> EvidenceRecord | None:
@@ -46,7 +48,7 @@ class DBRepository:
             filename=evidence.filename,
             content_type=evidence.content_type,
             source=evidence.source,
-            uploaded_at=self._iso(evidence.uploaded_at),
+            uploaded_at=self._iso(evidence.created_at),
         )
 
     def save_detection(self, result: DetectionResult) -> DetectionResult:

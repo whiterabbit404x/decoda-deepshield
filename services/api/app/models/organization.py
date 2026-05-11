@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-from sqlalchemy import Column, DateTime, Index, String, func
+from sqlalchemy import Column, Index, String
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
+from app.models.mixins import UUIDTimestampMixin, uuid_pk
 
 
-class Organization(Base):
+class Organization(UUIDTimestampMixin, Base):
     __tablename__ = "organizations"
     __table_args__ = (Index("ix_organizations_created_at", "created_at"),)
 
-    organization_id = Column(String, primary_key=True, index=True)
+    organization_id = uuid_pk("organization_id")
     name = Column(String, nullable=False, index=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), index=True)
 
     users = relationship("User", back_populates="organization")
     workspaces = relationship("Workspace", back_populates="organization")
