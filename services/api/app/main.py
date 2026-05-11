@@ -4,11 +4,13 @@ import os
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException
+from sqlalchemy import func, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from .db import Base, engine, get_db
 from .detection import analyze_evidence
-from .models import Organization, Workspace
+from .models import Alert, Detection, Evidence, Incident, Organization, Workspace
 from .repositories import DBRepository
 from .schemas import AlertRecord, DetectionRequest, EvidenceRecord, IncidentRecord, UploadRequest
 
@@ -47,6 +49,49 @@ def startup() -> None:
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok", "service": "deepshield-api"}
+
+
+@app.get("/runtime/status")
+def runtime_status(db: Session = Depends(get_db)) -> dict:
+    def _isoformat(value):
+        return value.isoformat() if value else None
+
+    status = {
+        "api_status": "healthy",
+        "database_status": "degraded",
+        "evidence_count": 0,
+        "detection_count": 0,
+        "alert_count": 0,
+        "incident_count": 0,
+        "last_evidence_at": None,
+        "last_detection_at": None,
+        "last_sync_at": None,
+    }
+
+    try:
+        db.execute(text("SELECT 1"))
+        status["database_status"] = "healthy"
+
+        status["evidence_count"] = db.query(Evidence).count()
+        status["detection_count"] = db.query(Detection).count()
+        status["alert_count"] = db.query(Alert).count()
+        status["incident_count"] = db.query(Incident).count()
+
+        latest_evidence = db.query(func.max(Evidence.created_at)).scalar()
+        latest_detection = db.query(func.max(Detection.created_at)).scalar()
+        latest_alert = db.query(func.max(Alert.created_at)).scalar()
+        latest_incident = db.query(func.max(Incident.created_at)).scalar()
+
+        status["last_evidence_at"] = _isoformat(latest_evidence)
+        status["last_detection_at"] = _isoformat(latest_detection)
+
+        sync_candidates = [latest_evidence, latest_detection, latest_alert, latest_incident]
+        status["last_sync_at"] = _isoformat(max((ts for ts in sync_candidates if ts is not None), default=None))
+    except SQLAlchemyError:
+        # Keep endpoint payload shape stable for client polling loops.
+        status["api_status"] = "degraded"
+
+    return status
 
 
 @app.post("/evidence/upload")
