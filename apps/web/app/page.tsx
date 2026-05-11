@@ -1,18 +1,20 @@
 import { DashboardClient } from "@/components/dashboard/DashboardClient";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
-import { getAlerts, getHealth, getIncidents } from "@/lib/api";
+import { getAlerts, getHealth, getIncidents, getRuntimeStatus } from "@/lib/api";
 
 export default async function HomePage() {
-  const [healthResult, alertsResult, incidentsResult] = await Promise.allSettled([
+  const [healthResult, alertsResult, incidentsResult, runtimeStatusResult] = await Promise.allSettled([
     getHealth(),
     getAlerts(),
-    getIncidents()
+    getIncidents(),
+    getRuntimeStatus()
   ]);
 
   const health = healthResult.status === "fulfilled" ? healthResult.value : null;
   const alerts = alertsResult.status === "fulfilled" ? alertsResult.value : [];
   const incidents = incidentsResult.status === "fulfilled" ? incidentsResult.value : [];
+  const runtimeStatus = runtimeStatusResult.status === "fulfilled" ? runtimeStatusResult.value : null;
 
   return (
     <main className="app-shell">
@@ -21,6 +23,7 @@ export default async function HomePage() {
         <Topbar />
         <DashboardClient
           health={health}
+          runtimeStatus={runtimeStatus}
           alerts={alerts}
           incidents={incidents}
           alertsError={alertsResult.status === "rejected" ? alertsResult.reason?.message : undefined}

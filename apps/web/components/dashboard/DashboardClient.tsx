@@ -8,11 +8,11 @@ import { DataTables } from "@/components/dashboard/DataTables";
 import { StatCards } from "@/components/dashboard/StatCards";
 import { UploadPanel } from "@/components/dashboard/UploadPanel";
 import { getAlerts, getIncidents } from "@/lib/api";
-import { type Alert, type DetectionOutput, type HealthResponse, type Incident } from "@/types/api";
+import { type Alert, type DetectionOutput, type HealthResponse, type Incident, type RuntimeStatus } from "@/types/api";
 
-interface DashboardClientProps { health: HealthResponse | null; alerts: Alert[]; incidents: Incident[]; alertsError?: string; incidentsError?: string; }
+interface DashboardClientProps { health: HealthResponse | null; runtimeStatus: RuntimeStatus | null; alerts: Alert[]; incidents: Incident[]; alertsError?: string; incidentsError?: string; }
 
-export function DashboardClient({ health, alerts: initialAlerts, incidents: initialIncidents, alertsError: initialAlertsError, incidentsError: initialIncidentsError }: DashboardClientProps) {
+export function DashboardClient({ health, runtimeStatus, alerts: initialAlerts, incidents: initialIncidents, alertsError: initialAlertsError, incidentsError: initialIncidentsError }: DashboardClientProps) {
   const [detections, setDetections] = useState<DetectionOutput[]>([]);
   const [alerts, setAlerts] = useState(initialAlerts);
   const [incidents, setIncidents] = useState(initialIncidents);
@@ -35,7 +35,7 @@ export function DashboardClient({ health, alerts: initialAlerts, incidents: init
           if (i.status === "fulfilled") { setIncidents(i.value); setIncidentsError(undefined); } else setIncidentsError(i.reason?.message ?? "Failed");
         }}>Refresh</button>
       </section>
-      <StatCards health={health} alerts={alerts} incidents={incidents} />
+      <StatCards health={health} runtimeStatus={runtimeStatus} alerts={alerts} incidents={incidents} />
       <section className="middle-grid">
         <RiskTrendChart periodLabel={periodLabel} />
         <UploadPanel onDetections={setDetections} />
