@@ -24,23 +24,18 @@ export interface Incident {
 }
 
 export interface EvidenceUploadResponse {
-  upload_id?: string;
-  filename?: string;
-  status: string;
-  message?: string;
+  evidence_id: string;
+  uploaded_at: string;
 }
 
 export interface DetectionOutput {
-  id?: string;
-  label: string;
-  confidence?: number;
-  score?: number;
-  details?: string;
-  created_at?: string;
+  evidence_id: string;
+  synthetic_risk_score: number;
+  risk_level: "low" | "medium" | "high";
+  reason_codes: string[];
+  recommended_action: string;
+  created_at: string;
+  decision_support_disclaimer: string;
 }
 
-export interface AnalyzeDetectionResponse {
-  status?: string;
-  detections: DetectionOutput[];
-  summary?: string;
-}
+export type AnalyzeDetectionResponse = DetectionOutput;
