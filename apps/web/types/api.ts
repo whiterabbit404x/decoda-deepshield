@@ -23,6 +23,11 @@ export interface Incident {
   created_at?: string;
 }
 
+export interface RuntimeStatus {
+  status?: string;
+  last_sync_at?: string;
+}
+
 export interface EvidenceUploadResponse {
   evidence_id: string;
   uploaded_at: string;

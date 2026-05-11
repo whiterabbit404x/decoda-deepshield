@@ -1,4 +1,4 @@
-import { type Alert, type HealthResponse, type Incident } from "@/types/api";
+import { type Alert, type HealthResponse, type Incident, type RuntimeStatus } from "@/types/api";
 
 export interface StatCardProps {
   label: string;
@@ -10,6 +10,7 @@ export interface StatCardProps {
 
 interface StatCardsProps {
   health?: HealthResponse | null;
+  runtimeStatus?: RuntimeStatus | null;
   alerts: Alert[];
   incidents: Incident[];
 }
@@ -26,7 +27,15 @@ export function StatCard({ label, value, delta, direction, status }: StatCardPro
   );
 }
 
-export function StatCards({ health, alerts, incidents }: StatCardsProps) {
+export function StatCards({ health, runtimeStatus, alerts, incidents }: StatCardsProps) {
+  const lastSyncAt = runtimeStatus?.last_sync_at;
+  const formattedLastSync = lastSyncAt
+    ? new Date(lastSyncAt).toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short"
+      })
+    : "Unavailable";
+
   const stats: StatCardProps[] = [
     { label: "Threats Blocked", value: `${alerts.length}`, delta: "8% vs prior period", direction: "up", status: "good" },
     {
@@ -45,7 +54,7 @@ export function StatCards({ health, alerts, incidents }: StatCardsProps) {
     },
     {
       label: "Last Sync",
-      value: health?.timestamp ? new Date(health.timestamp).toLocaleTimeString() : "Unavailable",
+      value: formattedLastSync,
       delta: "Realtime feed",
       direction: "up",
       status: "neutral"

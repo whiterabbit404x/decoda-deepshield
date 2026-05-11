@@ -3,7 +3,8 @@ import {
   type AnalyzeDetectionResponse,
   type EvidenceUploadResponse,
   type HealthResponse,
-  type Incident
+  type Incident,
+  type RuntimeStatus
 } from "@/types/api";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -63,6 +64,7 @@ export async function fetchJson<T>(
 export const getHealth = () => fetchJson<HealthResponse>("/health");
 export const getAlerts = () => fetchJson<Alert[]>("/alerts");
 export const getIncidents = () => fetchJson<Incident[]>("/incidents");
+export const getRuntimeStatus = () => fetchJson<RuntimeStatus>("/runtime/status");
 
 export function uploadEvidence(file: File) {
   return fetchJson<EvidenceUploadResponse>("/evidence/upload", {
