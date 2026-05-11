@@ -47,6 +47,7 @@ class DetectionResult(BaseModel):
     recommended_action: str
     created_at: str = Field(default_factory=utcnow_iso)
     decision_support_disclaimer: str = MVP_DISCLAIMER
+    simulated_model_version: str = "sim-hash-v1"
 
 
 class AlertRecord(BaseModel):
