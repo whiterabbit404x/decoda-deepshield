@@ -51,3 +51,9 @@ For full Railway smoke test commands including analyze/export calls, see `servic
 ## MVP disclaimer
 
 DeepShield MVP is decision-support only and uses deterministic simulated detection logic. It does not provide real biometric identification, face recognition identity matching, paid API integrations, or production fraud adjudication.
+
+## Vercel deployment settings (frontend)
+
+- Root Directory: `apps/web`
+- Environment variable:
+  - `NEXT_PUBLIC_API_BASE_URL=https://decoda-deepshield-production.up.railway.app`

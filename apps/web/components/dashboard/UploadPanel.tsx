@@ -3,7 +3,7 @@
 import { type ChangeEvent, useMemo, useRef, useState } from "react";
 
 import { analyzeDetections, uploadEvidence } from "@/lib/api";
-import { type DetectionOutput, type EvidenceUploadResponse } from "@/types/api";
+import { type DetectionOutput } from "@/types/api";
 
 interface UploadPanelProps {
   onDetections: (detections: DetectionOutput[]) => void;
@@ -13,15 +13,17 @@ const MAX_SIZE = 50 * 1024 * 1024;
 const ALLOWED = ["application/json", "text/csv", "application/vnd.tcpdump.pcap"];
 
 export function UploadPanel({ onDetections }: UploadPanelProps) {
-  const [textToAnalyze, setTextToAnalyze] = useState("");
   const [uploadStatus, setUploadStatus] = useState("");
+  const [analysisStatus, setAnalysisStatus] = useState("");
+  const [evidenceId, setEvidenceId] = useState<string | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [progress, setProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const statusTone = useMemo(() => uploadStatus.includes("failed") || uploadStatus.includes("Invalid") ? "state-error" : "", [uploadStatus]);
+  const statusTone = useMemo(() => (apiError ? "state-error" : ""), [apiError]);
 
   const validateFile = (file: File) => {
     if (!ALLOWED.includes(file.type)) return "Invalid file type. Use JSON, CSV, or PCAP.";
@@ -32,20 +34,24 @@ export function UploadPanel({ onDetections }: UploadPanelProps) {
   const uploadFile = async (file: File) => {
     const validation = validateFile(file);
     if (validation) {
-      setUploadStatus(validation);
+      setApiError(validation);
       return;
     }
+    setApiError(null);
+    setAnalysisStatus("");
     setIsUploading(true);
     setProgress(20);
     setUploadStatus("Uploading evidence…");
+    setEvidenceId(null);
+
     try {
-      const text = await file.text();
-      setProgress(65);
-      const result: EvidenceUploadResponse = await uploadEvidence(file.name, { content: text });
+      const result = await uploadEvidence(file);
       setProgress(100);
-      setUploadStatus(result.message ?? `Upload ${result.status}`);
+      setEvidenceId(result.evidence_id);
+      setUploadStatus("Upload successful");
     } catch (error) {
-      setUploadStatus(error instanceof Error ? error.message : "Upload failed");
+      setUploadStatus("");
+      setApiError(error instanceof Error ? `API error: ${error.message}` : "API error: Upload failed");
       setProgress(0);
     } finally {
       setIsUploading(false);
@@ -55,6 +61,24 @@ export function UploadPanel({ onDetections }: UploadPanelProps) {
   const onFileChosen = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) await uploadFile(file);
+  };
+
+  const runAnalysis = async () => {
+    if (!evidenceId) return;
+    setIsAnalyzing(true);
+    setApiError(null);
+    setAnalysisStatus("Analyzing evidence…");
+
+    try {
+      const result = await analyzeDetections(evidenceId);
+      onDetections([result]);
+      setAnalysisStatus("Detection completed");
+    } catch (error) {
+      setAnalysisStatus("");
+      setApiError(error instanceof Error ? `API error: ${error.message}` : "API error: Analysis failed");
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   return (
@@ -80,15 +104,14 @@ export function UploadPanel({ onDetections }: UploadPanelProps) {
       <input ref={inputRef} type="file" hidden onChange={onFileChosen} aria-label="Choose evidence files" />
       <button className="upload-btn" onClick={() => inputRef.current?.click()} aria-label="Choose files for upload">Choose Files</button>
       {isUploading ? <div className="progress" aria-label="Upload progress"><span style={{ width: `${progress}%` }} /></div> : null}
-      {uploadStatus ? <p className={`state-text ${statusTone}`}>{uploadStatus}</p> : null}
+      {uploadStatus ? <p className="state-text">{uploadStatus}</p> : null}
+      {evidenceId ? <p className="state-text">Evidence ID: <code>{evidenceId}</code></p> : null}
+      {analysisStatus ? <p className="state-text">{analysisStatus}</p> : null}
+      {apiError ? <p className={`state-text ${statusTone}`}>{apiError}</p> : null}
 
-      <textarea className="analyze-input" placeholder="Paste IOC evidence, logs, or suspicious activity summary…" value={textToAnalyze} onChange={(event) => setTextToAnalyze(event.target.value)} />
-      <button className="upload-btn secondary" onClick={async () => {
-        setIsAnalyzing(true);
-        onDetections([{ label: "Pending model analysis…" }]);
-        try { const result = await analyzeDetections(textToAnalyze); onDetections(result.detections); }
-        finally { setIsAnalyzing(false); }
-      }} disabled={isAnalyzing || !textToAnalyze.trim()}>{isAnalyzing ? "Analyzing…" : "Analyze Detections"}</button>
+      <button className="upload-btn secondary" onClick={runAnalysis} disabled={isAnalyzing || !evidenceId}>
+        {isAnalyzing ? "Analyzing…" : "Analyze evidence"}
+      </button>
     </article>
   );
 }

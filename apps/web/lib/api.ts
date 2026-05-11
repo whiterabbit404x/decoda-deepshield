@@ -64,16 +64,20 @@ export const getHealth = () => fetchJson<HealthResponse>("/health");
 export const getAlerts = () => fetchJson<Alert[]>("/alerts");
 export const getIncidents = () => fetchJson<Incident[]>("/incidents");
 
-export function uploadEvidence(fileName: string, payload: unknown) {
+export function uploadEvidence(file: File) {
   return fetchJson<EvidenceUploadResponse>("/evidence/upload", {
     method: "POST",
-    body: JSON.stringify({ file_name: fileName, payload })
+    body: JSON.stringify({
+      filename: file.name,
+      content_type: file.type || null,
+      source: "dashboard"
+    })
   });
 }
 
-export function analyzeDetections(content: string) {
+export function analyzeDetections(evidence_id: string) {
   return fetchJson<AnalyzeDetectionResponse>("/detections/analyze", {
     method: "POST",
-    body: JSON.stringify({ content })
+    body: JSON.stringify({ evidence_id })
   });
 }

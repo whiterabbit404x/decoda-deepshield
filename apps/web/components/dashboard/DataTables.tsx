@@ -15,7 +15,16 @@ export function DataTables({ detections, incidents, incidentsError, onRetryIncid
       <article className="card table-card">
         <h3>Recent Detections</h3>
         {detections.length === 0 ? <p className="state-text">No detections analyzed yet.</p> : (
-          <ul>{detections.map((d) => <li key={d.id ?? d.label}><strong>{d.label}</strong><p className="muted">{truncate(d.details ?? "No summary provided.")}</p></li>)}</ul>
+          <ul>
+            {detections.map((d) => (
+              <li key={`${d.evidence_id}-${d.created_at}`}>
+                <div><strong>{d.risk_level.toUpperCase()}</strong> · Score {d.synthetic_risk_score.toFixed(2)}</div>
+                <p className="muted">Evidence ID: {d.evidence_id}</p>
+                <p className="muted">Reasons: {truncate(d.reason_codes.join(", ") || "No reason codes")}</p>
+                <p className="muted">Action: {truncate(d.recommended_action)}</p>
+              </li>
+            ))}
+          </ul>
         )}
       </article>
       <article className="card table-card">
