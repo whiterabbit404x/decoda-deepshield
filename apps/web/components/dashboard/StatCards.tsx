@@ -37,20 +37,20 @@ export function StatCards({ health, runtimeStatus, alerts, incidents }: StatCard
     : "Unavailable";
 
   const stats: StatCardProps[] = [
-    { label: "Threats Blocked", value: `${alerts.length}`, delta: "8% vs prior period", direction: "up", status: "good" },
+    { label: "Threats Blocked", value: `${runtimeStatus?.alert_count ?? alerts.length}`, delta: "8% vs prior period", direction: "up", status: "good" },
     {
       label: "Active Incidents",
-      value: `${incidents.length}`,
+      value: `${runtimeStatus?.incident_count ?? incidents.length}`,
       delta: incidents.length > 0 ? "Requires response" : "No active response",
       direction: incidents.length > 0 ? "up" : "down",
       status: incidents.length > 4 ? "critical" : incidents.length > 0 ? "warning" : "good"
     },
     {
       label: "API Status",
-      value: health?.status ?? "Offline",
+      value: runtimeStatus?.api_status ?? health?.status ?? "Offline",
       delta: health?.service ?? "Connectivity issue",
-      direction: health?.status?.toLowerCase() === "ok" ? "up" : "down",
-      status: health?.status?.toLowerCase() === "ok" ? "good" : "critical"
+      direction: (runtimeStatus?.api_status ?? health?.status)?.toLowerCase() === "ok" ? "up" : "down",
+      status: (runtimeStatus?.api_status ?? health?.status)?.toLowerCase() === "ok" ? "good" : "critical"
     },
     {
       label: "Last Sync",

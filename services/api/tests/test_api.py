@@ -80,6 +80,7 @@ def test_end_to_end_chain_and_runtime_status(client: TestClient) -> None:
         "recommended_action",
         "created_at",
         "decision_support_disclaimer",
+        "simulated_model_version",
     ]:
         assert key in detection
 
@@ -146,15 +147,18 @@ def test_end_to_end_chain_and_runtime_status(client: TestClient) -> None:
     runtime_resp = client.get("/runtime/status")
     assert runtime_resp.status_code == 200
     runtime = runtime_resp.json()
-    assert runtime["api_status"] == "healthy"
-    assert runtime["database_status"] == "healthy"
+    assert runtime["api_status"] == "ok"
+    assert runtime["database_status"] == "ok"
     assert runtime["evidence_count"] >= 1
     assert runtime["detection_count"] >= 1
     assert runtime["alert_count"] == 1
     assert runtime["incident_count"] == 1
     assert runtime["last_evidence_at"]
     assert runtime["last_detection_at"]
+    assert runtime["last_alert_at"]
+    assert runtime["last_incident_at"]
     assert runtime["last_sync_at"]
+    assert runtime["mode"] == "simulated_decision_support"
 
 
 def test_low_risk_does_not_create_alert_or_incident(client: TestClient) -> None:

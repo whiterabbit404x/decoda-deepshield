@@ -31,7 +31,7 @@ export function DataTables({ detections, incidents, incidentsError, onRetryIncid
         <h3>Incidents</h3>
         {incidentsError ? <p className="state-text state-error">{incidentsError} <button className="link-btn" onClick={onRetryIncidents}>Reload panel</button></p> : null}
         {!incidentsError && incidents.length === 0 ? <p className="state-text">No incidents found.</p> : null}
-        {!incidentsError && incidents.length > 0 ? <ul>{incidents.map((i) => <li key={i.id}><div><span className={`badge sev-${(i.severity ?? "low").toLowerCase()}`}>{i.severity ?? "low"}</span> <strong>{i.title}</strong></div><p className="muted">{truncate(i.status ?? "Awaiting triage")}</p><small>{i.created_at ? new Date(i.created_at).toLocaleString() : "No timestamp"}</small></li>)}</ul> : null}
+        {!incidentsError && incidents.length > 0 ? <ul>{incidents.map((i) => <li key={i.incident_id}><div><span className={`badge sev-${i.priority.toLowerCase()}`}>{i.priority}</span> <strong>{i.summary}</strong></div><p className="muted">{truncate(i.status)}</p><small>{i.created_at ? new Date(i.created_at).toLocaleString() : "No timestamp"}</small></li>)}</ul> : null}
       </article>
     </section>
   );

@@ -17,12 +17,12 @@ export function AlertsList({ alerts, error, loading, onRetry }: AlertsListProps)
       {!loading && !error && alerts.length > 0 ? (
         <ul>
           {alerts.map((alert) => (
-            <li key={alert.id}>
+            <li key={alert.alert_id}>
               <div>
-                <span>{alert.title}</span>
+                <span>{alert.recommended_action}</span>
                 <p className="muted">{alert.created_at ? new Date(alert.created_at).toLocaleString() : "No timestamp"}</p>
               </div>
-              <strong className={`badge pri-${alert.level.toLowerCase()}`}>{alert.level}</strong>
+              <strong className={`badge pri-${alert.severity.toLowerCase()}`}>{alert.severity}</strong>
             </li>
           ))}
         </ul>
