@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from uuid import UUID
 
 import uvicorn
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from sqlalchemy import func, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -18,6 +19,23 @@ from .storage import LocalEvidenceStorage
 from .schemas import AlertRecord, DetectionRequest, EvidenceRecord, IncidentRecord, UploadRequest, UploadResponse
 
 app = FastAPI(title="DeepShield API", version="0.1.0")
+
+
+def get_workspace_id(
+    x_workspace_id: str | None = Header(default=None, alias="X-Workspace-Id"),
+    db: Session = Depends(get_db),
+) -> str:
+    if not x_workspace_id:
+        raise HTTPException(status_code=400, detail="X-Workspace-Id header is required")
+    try:
+        UUID(x_workspace_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="X-Workspace-Id must be a valid UUID") from exc
+
+    workspace = db.query(Workspace).filter(Workspace.workspace_id == x_workspace_id).first()
+    if not workspace:
+        raise HTTPException(status_code=404, detail="workspace not found")
+    return x_workspace_id
 
 
 def get_default_analyzer() -> EvidenceAnalyzer:
@@ -59,7 +77,7 @@ def health() -> dict:
 
 
 @app.get("/runtime/status")
-def runtime_status(db: Session = Depends(get_db)) -> dict:
+def runtime_status(workspace_id: str = Depends(get_workspace_id), db: Session = Depends(get_db)) -> dict:
     def _isoformat(value):
         return value.isoformat() if value else None
 
@@ -82,15 +100,45 @@ def runtime_status(db: Session = Depends(get_db)) -> dict:
         db.execute(text("SELECT 1"))
         status["database_status"] = "ok"
 
-        status["evidence_count"] = db.query(Evidence).count()
-        status["detection_count"] = db.query(Detection).count()
-        status["alert_count"] = db.query(Alert).count()
-        status["incident_count"] = db.query(Incident).count()
+        status["evidence_count"] = db.query(Evidence).filter(Evidence.workspace_id == workspace_id).count()
+        status["detection_count"] = (
+            db.query(Detection)
+            .join(Evidence, Evidence.evidence_id == Detection.evidence_id)
+            .filter(Evidence.workspace_id == workspace_id)
+            .count()
+        )
+        status["alert_count"] = (
+            db.query(Alert)
+            .join(Evidence, Evidence.evidence_id == Alert.evidence_id)
+            .filter(Evidence.workspace_id == workspace_id)
+            .count()
+        )
+        status["incident_count"] = (
+            db.query(Incident)
+            .join(Evidence, Evidence.evidence_id == Incident.evidence_id)
+            .filter(Evidence.workspace_id == workspace_id)
+            .count()
+        )
 
-        latest_evidence = db.query(func.max(Evidence.created_at)).scalar()
-        latest_detection = db.query(func.max(Detection.created_at)).scalar()
-        latest_alert = db.query(func.max(Alert.created_at)).scalar()
-        latest_incident = db.query(func.max(Incident.created_at)).scalar()
+        latest_evidence = db.query(func.max(Evidence.created_at)).filter(Evidence.workspace_id == workspace_id).scalar()
+        latest_detection = (
+            db.query(func.max(Detection.created_at))
+            .join(Evidence, Evidence.evidence_id == Detection.evidence_id)
+            .filter(Evidence.workspace_id == workspace_id)
+            .scalar()
+        )
+        latest_alert = (
+            db.query(func.max(Alert.created_at))
+            .join(Evidence, Evidence.evidence_id == Alert.evidence_id)
+            .filter(Evidence.workspace_id == workspace_id)
+            .scalar()
+        )
+        latest_incident = (
+            db.query(func.max(Incident.created_at))
+            .join(Evidence, Evidence.evidence_id == Incident.evidence_id)
+            .filter(Evidence.workspace_id == workspace_id)
+            .scalar()
+        )
 
         status["last_evidence_at"] = _isoformat(latest_evidence)
         status["last_detection_at"] = _isoformat(latest_detection)
@@ -112,6 +160,7 @@ async def upload_evidence(
     filename: str | None = Form(default=None),
     content_type: str | None = Form(default=None),
     source: str | None = Form(default=None),
+    workspace_id: str = Depends(get_workspace_id),
     db: Session = Depends(get_db),
 ) -> UploadResponse:
     upload_filename = filename
@@ -160,7 +209,8 @@ async def upload_evidence(
             sha256_hash=storage_metadata["sha256_hash"],
             ingestion_status=(payload.ingestion_status if file is None and 'payload' in locals() else "ingested"),
             analysis_status=(payload.analysis_status if file is None and 'payload' in locals() else "pending"),
-        )
+        ),
+        workspace_id=workspace_id,
     )
     return UploadResponse(
         evidence_id=rec.evidence_id,
@@ -178,18 +228,19 @@ async def upload_evidence(
 @app.post("/detections/analyze")
 def run_detection(
     payload: DetectionRequest,
+    workspace_id: str = Depends(get_workspace_id),
     db: Session = Depends(get_db),
     analyzer: EvidenceAnalyzer = Depends(get_default_analyzer),
 ) -> dict:
     repo = DBRepository(db)
-    evidence = repo.get_evidence(payload.evidence_id)
+    evidence = repo.get_evidence(payload.evidence_id, workspace_id=workspace_id)
     if not evidence:
         raise HTTPException(status_code=404, detail="evidence not found")
 
-    job = repo.create_analysis_job(evidence_id=evidence.evidence_id, workspace_id=DBRepository.DEFAULT_WORKSPACE_ID)
+    job = repo.create_analysis_job(evidence_id=evidence.evidence_id, workspace_id=workspace_id)
 
     try:
-        detection = repo.save_detection(analyzer.analyze(evidence))
+        detection = repo.save_detection(analyzer.analyze(evidence), workspace_id=workspace_id)
 
         if detection.risk_level in {"medium", "high"}:
             alert = repo.create_alert(
@@ -199,7 +250,8 @@ def run_detection(
                     synthetic_risk_score=detection.synthetic_risk_score,
                     reason_codes=detection.reason_codes,
                     recommended_action=detection.recommended_action,
-                )
+                ),
+                workspace_id=workspace_id,
             )
             repo.create_incident(
                 IncidentRecord(
@@ -214,7 +266,8 @@ def run_detection(
                         "alert_auto_created",
                         "incident_auto_opened",
                     ],
-                )
+                ),
+                workspace_id=workspace_id,
             )
 
         repo.complete_analysis_job(job.job_id, status="completed")
@@ -226,19 +279,19 @@ def run_detection(
 
 
 @app.get("/alerts")
-def list_alerts(db: Session = Depends(get_db)) -> list[dict]:
-    return [a.model_dump() for a in DBRepository(db).list_alerts()]
+def list_alerts(workspace_id: str = Depends(get_workspace_id), db: Session = Depends(get_db)) -> list[dict]:
+    return [a.model_dump() for a in DBRepository(db).list_alerts(workspace_id=workspace_id)]
 
 
 @app.get("/incidents")
-def list_incidents(db: Session = Depends(get_db)) -> list[dict]:
-    return [i.model_dump() for i in DBRepository(db).list_incidents()]
+def list_incidents(workspace_id: str = Depends(get_workspace_id), db: Session = Depends(get_db)) -> list[dict]:
+    return [i.model_dump() for i in DBRepository(db).list_incidents(workspace_id=workspace_id)]
 
 
 @app.get("/evidence/{evidence_id}/export")
-def export_evidence(evidence_id: str, db: Session = Depends(get_db)) -> dict:
+def export_evidence(evidence_id: str, workspace_id: str = Depends(get_workspace_id), db: Session = Depends(get_db)) -> dict:
     try:
-        return DBRepository(db).export_evidence_package(evidence_id)
+        return DBRepository(db).export_evidence_package(evidence_id, workspace_id=workspace_id)
     except KeyError:
         raise HTTPException(status_code=404, detail="evidence not found")
 

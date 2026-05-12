@@ -13,6 +13,9 @@ from app.main import app, startup
 from app.models import AuditEvent
 from app.repositories import DBRepository
 
+WORKSPACE_ID = DBRepository.DEFAULT_WORKSPACE_ID
+WORKSPACE_HEADERS = {"X-Workspace-Id": WORKSPACE_ID}
+
 
 @pytest.fixture()
 def client(tmp_path) -> Generator[TestClient, None, None]:
@@ -48,11 +51,19 @@ def client(tmp_path) -> Generator[TestClient, None, None]:
 
 def _upload_and_analyze_until_level(test_client: TestClient, levels: set[str]) -> tuple[dict, dict]:
     for idx in range(250):
-        upload_resp = test_client.post("/evidence/upload", json={"filename": f"sample-{idx}.mp4"})
+        upload_resp = test_client.post(
+            "/evidence/upload",
+            json={"filename": f"sample-{idx}.mp4"},
+            headers=WORKSPACE_HEADERS,
+        )
         assert upload_resp.status_code == 200
         upload = upload_resp.json()
 
-        analysis = test_client.post("/detections/analyze", json={"evidence_id": upload["evidence_id"]})
+        analysis = test_client.post(
+            "/detections/analyze",
+            json={"evidence_id": upload["evidence_id"]},
+            headers=WORKSPACE_HEADERS,
+        )
         assert analysis.status_code == 200
         payload = analysis.json()
         if payload["risk_level"] in levels:
@@ -84,8 +95,8 @@ def test_end_to_end_chain_and_runtime_status(client: TestClient) -> None:
     ]:
         assert key in detection
 
-    alerts_resp = client.get("/alerts")
-    incidents_resp = client.get("/incidents")
+    alerts_resp = client.get("/alerts", headers=WORKSPACE_HEADERS)
+    incidents_resp = client.get("/incidents", headers=WORKSPACE_HEADERS)
     assert alerts_resp.status_code == 200
     assert incidents_resp.status_code == 200
 
@@ -125,7 +136,7 @@ def test_end_to_end_chain_and_runtime_status(client: TestClient) -> None:
     assert incident["evidence_id"] == upload["evidence_id"]
     assert incident["alert_id"] == alert["alert_id"]
 
-    export_resp = client.get(f"/evidence/{upload['evidence_id']}/export")
+    export_resp = client.get(f"/evidence/{upload['evidence_id']}/export", headers=WORKSPACE_HEADERS)
     assert export_resp.status_code == 200
     exported = export_resp.json()
 
@@ -144,7 +155,7 @@ def test_end_to_end_chain_and_runtime_status(client: TestClient) -> None:
     assert exported["related_alert"]["alert_id"] == alert["alert_id"]
     assert exported["related_incident"]["incident_id"] == incident["incident_id"]
 
-    runtime_resp = client.get("/runtime/status")
+    runtime_resp = client.get("/runtime/status", headers=WORKSPACE_HEADERS)
     assert runtime_resp.status_code == 200
     runtime = runtime_resp.json()
     assert runtime["api_status"] == "ok"
@@ -163,13 +174,13 @@ def test_end_to_end_chain_and_runtime_status(client: TestClient) -> None:
 
 def test_low_risk_does_not_create_alert_or_incident(client: TestClient) -> None:
     _upload_and_analyze_until_level(client, {"low"})
-    assert client.get("/alerts").json() == []
-    assert client.get("/incidents").json() == []
+    assert client.get("/alerts", headers=WORKSPACE_HEADERS).json() == []
+    assert client.get("/incidents", headers=WORKSPACE_HEADERS).json() == []
 
 
 def test_audit_events_include_required_types(client: TestClient) -> None:
     upload, _ = _upload_and_analyze_until_level(client, {"medium", "high"})
-    export_resp = client.get(f"/evidence/{upload['evidence_id']}/export")
+    export_resp = client.get(f"/evidence/{upload['evidence_id']}/export", headers=WORKSPACE_HEADERS)
     assert export_resp.status_code == 200
 
     db_gen = app.dependency_overrides[get_db]()
@@ -196,7 +207,7 @@ def test_persistence_across_repository_sessions(client: TestClient) -> None:
     db1 = next(db1_gen)
     try:
         repo1 = DBRepository(db1)
-        assert repo1.get_evidence(upload["evidence_id"]) is not None
+        assert repo1.get_evidence(upload["evidence_id"], workspace_id=WORKSPACE_ID) is not None
     finally:
         db1.close()
 
@@ -204,8 +215,8 @@ def test_persistence_across_repository_sessions(client: TestClient) -> None:
     db2 = next(db2_gen)
     try:
         repo2 = DBRepository(db2)
-        assert repo2.get_evidence(upload["evidence_id"]) is not None
-        assert any(a.evidence_id == upload["evidence_id"] for a in repo2.list_alerts())
-        assert any(i.evidence_id == upload["evidence_id"] for i in repo2.list_incidents())
+        assert repo2.get_evidence(upload["evidence_id"], workspace_id=WORKSPACE_ID) is not None
+        assert any(a.evidence_id == upload["evidence_id"] for a in repo2.list_alerts(workspace_id=WORKSPACE_ID))
+        assert any(i.evidence_id == upload["evidence_id"] for i in repo2.list_incidents(workspace_id=WORKSPACE_ID))
     finally:
         db2.close()
