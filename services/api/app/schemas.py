@@ -4,10 +4,16 @@ from datetime import datetime, timezone
 from typing import List, Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 
 RiskLevel = Literal["low", "medium", "high"]
+
+MVP_DISCLAIMER = (
+    "DeepShield MVP provides deterministic decision-support only. "
+    "It does not perform real biometric identification, face recognition matching, "
+    "or production fraud adjudication."
+)
 
 
 def utcnow_iso() -> str:
@@ -66,7 +72,13 @@ class DetectionResult(BaseModel):
     recommended_action: str
     created_at: str = Field(default_factory=utcnow_iso)
     analyzer_version: str = "sim-hash-v1"
-    decision_support_disclaimer: str = "DeepShield MVP provides deterministic decision-support only."
+    decision_support_disclaimer: str = MVP_DISCLAIMER
+
+    @computed_field(return_type=str)
+    @property
+    def simulated_model_version(self) -> str:
+        """Backward-compatible alias for legacy API clients/tests."""
+        return self.analyzer_version
 
 
 class AlertRecord(BaseModel):

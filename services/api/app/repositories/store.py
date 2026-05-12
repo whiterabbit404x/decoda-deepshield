@@ -287,8 +287,8 @@ class DBRepository:
                     reason_codes=detection.reason_codes,
                     recommended_action=detection.recommended_action,
                     created_at=self._iso(detection.created_at),
-                    decision_support_disclaimer=MVP_DISCLAIMER,
-                    simulated_model_version=SIMULATED_MODEL_VERSION,
+                    analyzer_version=SIMULATED_ANALYZER_VERSION,
+                    decision_support_disclaimer=MVP_DECISION_SUPPORT_DISCLAIMER,
                 ).model_dump()
                 if detection
                 else None
@@ -322,5 +322,5 @@ class DBRepository:
                 else None
             ),
             "generated_at": utcnow_iso(),
-            "disclaimer": MVP_DISCLAIMER,
+            "disclaimer": MVP_DECISION_SUPPORT_DISCLAIMER,
         }
