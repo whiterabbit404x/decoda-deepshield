@@ -48,6 +48,12 @@ class DBRepository:
             filename=record.filename,
             content_type=record.content_type,
             source=record.source,
+            storage_backend=record.storage_backend,
+            storage_path=record.storage_path,
+            file_size_bytes=record.file_size_bytes,
+            sha256_hash=record.sha256_hash,
+            ingestion_status=record.ingestion_status,
+            analysis_status=record.analysis_status,
         )
         self.db.add(evidence)
         self._add_audit_event(
@@ -55,7 +61,7 @@ class DBRepository:
             entity_type="evidence",
             entity_id=evidence.evidence_id,
             workspace_id=evidence.workspace_id,
-            metadata_json={"evidence_id": evidence.evidence_id},
+            metadata_json={"evidence_id": evidence.evidence_id, "storage_path": evidence.storage_path},
         )
         self.db.commit()
         self.db.refresh(evidence)
@@ -64,6 +70,12 @@ class DBRepository:
             filename=evidence.filename,
             content_type=evidence.content_type,
             source=evidence.source,
+            storage_backend=evidence.storage_backend,
+            storage_path=evidence.storage_path,
+            file_size_bytes=evidence.file_size_bytes,
+            sha256_hash=evidence.sha256_hash,
+            ingestion_status=evidence.ingestion_status,
+            analysis_status=evidence.analysis_status,
             uploaded_at=self._iso(evidence.created_at),
         )
 
@@ -76,6 +88,12 @@ class DBRepository:
             filename=evidence.filename,
             content_type=evidence.content_type,
             source=evidence.source,
+            storage_backend=evidence.storage_backend,
+            storage_path=evidence.storage_path,
+            file_size_bytes=evidence.file_size_bytes,
+            sha256_hash=evidence.sha256_hash,
+            ingestion_status=evidence.ingestion_status,
+            analysis_status=evidence.analysis_status,
             uploaded_at=self._iso(evidence.created_at),
         )
 

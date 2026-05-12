@@ -26,6 +26,12 @@ class EvidenceRecord(BaseModel):
     filename: str
     content_type: str | None = None
     source: str | None = None
+    storage_backend: str = "local"
+    storage_path: str | None = None
+    file_size_bytes: int = 0
+    sha256_hash: str | None = None
+    ingestion_status: str = "ingested"
+    analysis_status: str = "pending"
     uploaded_at: str = Field(default_factory=utcnow_iso)
 
 
