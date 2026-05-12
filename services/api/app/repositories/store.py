@@ -66,13 +66,14 @@ class DBRepository:
             workspace_id=evidence.workspace_id,
             metadata_json={"evidence_id": evidence.evidence_id, "storage_path": evidence.storage_path},
         )
-        self._add_audit_event(
-            event_type="evidence_file_hashed",
-            entity_type="evidence",
-            entity_id=evidence.evidence_id,
-            workspace_id=evidence.workspace_id,
-            metadata_json={"evidence_id": evidence.evidence_id, "sha256_hash": evidence.sha256_hash},
-        )
+        if evidence.sha256_hash:
+            self._add_audit_event(
+                event_type="evidence_file_hashed",
+                entity_type="evidence",
+                entity_id=evidence.evidence_id,
+                workspace_id=evidence.workspace_id,
+                metadata_json={"evidence_id": evidence.evidence_id, "sha256_hash": evidence.sha256_hash},
+            )
         self.db.commit()
         self.db.refresh(evidence)
         return EvidenceRecord(

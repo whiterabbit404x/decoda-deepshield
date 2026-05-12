@@ -179,7 +179,19 @@ def test_low_risk_does_not_create_alert_or_incident(client: TestClient) -> None:
 
 
 def test_audit_events_include_required_types(client: TestClient) -> None:
-    upload, _ = _upload_and_analyze_until_level(client, {"medium", "high"})
+    upload_resp = client.post(
+        "/evidence/upload",
+        files={"file": ("sample.bin", b"sample-bytes-for-hash", "application/octet-stream")},
+        headers=WORKSPACE_HEADERS,
+    )
+    assert upload_resp.status_code == 200
+    upload = upload_resp.json()
+    analysis = client.post(
+        "/detections/analyze",
+        json={"evidence_id": upload["evidence_id"]},
+        headers=WORKSPACE_HEADERS,
+    )
+    assert analysis.status_code == 200
     export_resp = client.get(f"/evidence/{upload['evidence_id']}/export", headers=WORKSPACE_HEADERS)
     assert export_resp.status_code == 200
 
@@ -203,7 +215,19 @@ def test_audit_events_include_required_types(client: TestClient) -> None:
 
 
 def test_audit_events_include_required_metadata_and_workspace_scope(client: TestClient) -> None:
-    upload, _ = _upload_and_analyze_until_level(client, {"medium", "high"})
+    upload_resp = client.post(
+        "/evidence/upload",
+        files={"file": ("sample.bin", b"sample-bytes-for-hash", "application/octet-stream")},
+        headers=WORKSPACE_HEADERS,
+    )
+    assert upload_resp.status_code == 200
+    upload = upload_resp.json()
+    analysis = client.post(
+        "/detections/analyze",
+        json={"evidence_id": upload["evidence_id"]},
+        headers=WORKSPACE_HEADERS,
+    )
+    assert analysis.status_code == 200
 
     db_gen = app.dependency_overrides[get_db]()
     db = next(db_gen)
