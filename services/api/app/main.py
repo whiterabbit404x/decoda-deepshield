@@ -10,13 +10,18 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from .db import Base, engine, get_db
-from .detection import analyze_evidence
+from .analyzers.base import EvidenceAnalyzer
+from .analyzers.simulated import SimulatedEvidenceAnalyzer
 from .models import Alert, Detection, Evidence, Incident, Organization, Workspace
 from .repositories import DBRepository
 from .storage import LocalEvidenceStorage
 from .schemas import AlertRecord, DetectionRequest, EvidenceRecord, IncidentRecord, UploadRequest, UploadResponse
 
 app = FastAPI(title="DeepShield API", version="0.1.0")
+
+
+def get_default_analyzer() -> EvidenceAnalyzer:
+    return SimulatedEvidenceAnalyzer()
 
 
 @app.on_event("startup")
@@ -171,13 +176,17 @@ async def upload_evidence(
 
 
 @app.post("/detections/analyze")
-def run_detection(payload: DetectionRequest, db: Session = Depends(get_db)) -> dict:
+def run_detection(
+    payload: DetectionRequest,
+    db: Session = Depends(get_db),
+    analyzer: EvidenceAnalyzer = Depends(get_default_analyzer),
+) -> dict:
     repo = DBRepository(db)
     evidence = repo.get_evidence(payload.evidence_id)
     if not evidence:
         raise HTTPException(status_code=404, detail="evidence not found")
 
-    detection = repo.save_detection(analyze_evidence(payload.evidence_id))
+    detection = repo.save_detection(analyzer.analyze(evidence))
 
     if detection.risk_level in {"medium", "high"}:
         alert = repo.create_alert(
