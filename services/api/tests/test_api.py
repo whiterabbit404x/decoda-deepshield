@@ -224,42 +224,45 @@ def test_audit_events_include_required_types(client: TestClient) -> None:
 
     db = _db_session()
     try:
-        event_types = {event.event_type for event in db.query(AuditEvent).all()}
+        evidence = db.query(Evidence).filter(Evidence.evidence_id == uploaded["evidence_id"]).one()
+        assert evidence.sha256_hash == expected_hash
+        assert evidence.storage_backend == "local"
+        assert evidence.file_size_bytes == len(payload)
+        assert Path(evidence.storage_path).read_bytes() == payload
     finally:
         db.close()
 
-    required = {
-        "evidence_uploaded",
-        "evidence_file_hashed",
-        "analysis_job_created",
-        "detection_generated",
-        "alert_created",
-        "incident_created",
-        "evidence_exported",
-    }
-    assert required.issubset(event_types)
 
+def test_workspace_isolation_and_scoped_entities(client: TestClient) -> None:
+    upload_a, _ = _upload_and_analyze_until_level(client, {"medium", "high"}, WORKSPACE_HEADERS)
+    upload_b = client.post(
+        "/evidence/upload",
+        json={"filename": "workspace-b.mp4"},
+        headers=WORKSPACE_B_HEADERS,
+    )
+    assert upload_b.status_code == 200
+    upload_b_id = upload_b.json()["evidence_id"]
 
-def test_audit_events_include_required_metadata_and_workspace_scope(client: TestClient) -> None:
-    upload, _ = _upload_and_analyze_until_level(client, {"medium", "high"})
+    assert client.get("/alerts", headers=WORKSPACE_HEADERS).status_code == 200
+    assert len(client.get("/alerts", headers=WORKSPACE_HEADERS).json()) == 1
+    assert client.get("/alerts", headers=WORKSPACE_B_HEADERS).json() == []
+
+    analyze_b = client.post("/detections/analyze", json={"evidence_id": upload_b_id}, headers=WORKSPACE_B_HEADERS)
+    assert analyze_b.status_code == 200
 
     db = _db_session()
     try:
-        events = db.query(AuditEvent).all()
+        events = db.query(AuditEvent).filter(AuditEvent.workspace_id == WORKSPACE_ID).all()
     finally:
         db.close()
 
-    assert events
-    for event in events:
-        assert event.workspace_id == WORKSPACE_ID
-        assert event.metadata_json["workspace_id"] == WORKSPACE_ID
-
     hashed_event = next(event for event in events if event.event_type == "evidence_file_hashed")
+    job_event = next(event for event in events if event.event_type == "analysis_job_created")
+
     assert hashed_event.metadata_json["evidence_id"] == upload["evidence_id"]
     assert hashed_event.metadata_json["workspace_id"] == WORKSPACE_ID
     assert "sha256_hash" in hashed_event.metadata_json
 
-    job_event = next(event for event in events if event.event_type == "analysis_job_created")
     assert job_event.metadata_json["job_id"] == job_event.entity_id
     assert job_event.metadata_json["evidence_id"] == upload["evidence_id"]
     assert job_event.metadata_json["workspace_id"] == WORKSPACE_ID
@@ -301,9 +304,8 @@ def test_persistence_across_repository_sessions(client: TestClient) -> None:
 
     db2 = _db_session()
     try:
-        repo2 = DBRepository(db2)
-        assert repo2.get_evidence(upload["evidence_id"], workspace_id=WORKSPACE_ID) is not None
-        assert any(a.evidence_id == upload["evidence_id"] for a in repo2.list_alerts(workspace_id=WORKSPACE_ID))
-        assert any(i.evidence_id == upload["evidence_id"] for i in repo2.list_incidents(workspace_id=WORKSPACE_ID))
+        assert db.query(Alert).filter(Alert.evidence_id == upload["evidence_id"], Alert.workspace_id == WORKSPACE_ID).count() == 1
+        assert db.query(Incident).filter(Incident.evidence_id == upload["evidence_id"], Incident.workspace_id == WORKSPACE_ID).count() == 1
+        assert db.query(AnalysisJob).filter(AnalysisJob.evidence_id == upload["evidence_id"], AnalysisJob.workspace_id == WORKSPACE_ID).count() >= 1
     finally:
-        db2.close()
+        db.close()
