@@ -6,8 +6,8 @@ from uuid import uuid4
 from sqlalchemy.orm import Session
 
 from app.models import Alert, AuditEvent, Detection, Evidence, Incident
-from app.schemas import MVP_DISCLAIMER, AlertRecord, DetectionResult, EvidenceRecord, IncidentRecord, utcnow_iso
-from app.detection import SIMULATED_MODEL_VERSION
+from app.analyzers.metadata import MVP_DECISION_SUPPORT_DISCLAIMER, SIMULATED_ANALYZER_VERSION
+from app.schemas import AlertRecord, DetectionResult, EvidenceRecord, IncidentRecord, utcnow_iso
 
 
 class DBRepository:
@@ -125,8 +125,8 @@ class DBRepository:
             reason_codes=detection.reason_codes,
             recommended_action=detection.recommended_action,
             created_at=self._iso(detection.created_at),
-            decision_support_disclaimer=MVP_DISCLAIMER,
-            simulated_model_version=SIMULATED_MODEL_VERSION,
+            analyzer_version=result.analyzer_version or SIMULATED_ANALYZER_VERSION,
+            decision_support_disclaimer=result.decision_support_disclaimer or MVP_DECISION_SUPPORT_DISCLAIMER,
         )
 
     def create_alert(self, alert: AlertRecord) -> AlertRecord:
@@ -287,8 +287,8 @@ class DBRepository:
                     reason_codes=detection.reason_codes,
                     recommended_action=detection.recommended_action,
                     created_at=self._iso(detection.created_at),
-                    decision_support_disclaimer=MVP_DISCLAIMER,
-                    simulated_model_version=SIMULATED_MODEL_VERSION,
+                    analyzer_version=SIMULATED_ANALYZER_VERSION,
+                    decision_support_disclaimer=MVP_DECISION_SUPPORT_DISCLAIMER,
                 ).model_dump()
                 if detection
                 else None
@@ -322,5 +322,5 @@ class DBRepository:
                 else None
             ),
             "generated_at": utcnow_iso(),
-            "disclaimer": MVP_DISCLAIMER,
+            "disclaimer": MVP_DECISION_SUPPORT_DISCLAIMER,
         }
