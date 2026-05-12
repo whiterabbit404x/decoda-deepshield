@@ -14,7 +14,7 @@ from .detection import analyze_evidence
 from .models import Alert, Detection, Evidence, Incident, Organization, Workspace
 from .repositories import DBRepository
 from .storage import LocalEvidenceStorage
-from .schemas import AlertRecord, DetectionRequest, EvidenceRecord, IncidentRecord, UploadRequest
+from .schemas import AlertRecord, DetectionRequest, EvidenceRecord, IncidentRecord, UploadRequest, UploadResponse
 
 app = FastAPI(title="DeepShield API", version="0.1.0")
 
@@ -108,7 +108,7 @@ async def upload_evidence(
     content_type: str | None = Form(default=None),
     source: str | None = Form(default=None),
     db: Session = Depends(get_db),
-) -> dict:
+) -> UploadResponse:
     upload_filename = filename
     upload_content_type = content_type
     storage_metadata = {
@@ -124,7 +124,10 @@ async def upload_evidence(
         upload_filename = payload.filename
         upload_content_type = payload.content_type
         source = payload.source
-        storage_metadata["storage_path"] = payload.source
+        storage_metadata["storage_backend"] = payload.storage_backend
+        storage_metadata["storage_path"] = payload.storage_path or payload.source
+        storage_metadata["file_size_bytes"] = payload.file_size_bytes
+        storage_metadata["sha256_hash"] = payload.sha256_hash
 
     if file is not None:
         storage = LocalEvidenceStorage(Path(__file__).resolve().parents[1] / "uploads")
@@ -143,24 +146,28 @@ async def upload_evidence(
     rec = DBRepository(db).create_evidence(
         EvidenceRecord(
             filename=upload_filename,
+            original_filename=(payload.original_filename if file is None and 'payload' in locals() else upload_filename),
             content_type=upload_content_type,
             source=source,
             storage_backend=storage_metadata["storage_backend"],
             storage_path=storage_metadata["storage_path"],
             file_size_bytes=storage_metadata["file_size_bytes"],
             sha256_hash=storage_metadata["sha256_hash"],
-            ingestion_status="ingested",
-            analysis_status="pending",
+            ingestion_status=(payload.ingestion_status if file is None and 'payload' in locals() else "ingested"),
+            analysis_status=(payload.analysis_status if file is None and 'payload' in locals() else "pending"),
         )
     )
-    return {
-        "evidence_id": rec.evidence_id,
-        "uploaded_at": rec.uploaded_at,
-        "sha256_hash": rec.sha256_hash,
-        "storage_backend": rec.storage_backend,
-        "storage_path": rec.storage_path,
-        "file_size_bytes": rec.file_size_bytes,
-    }
+    return UploadResponse(
+        evidence_id=rec.evidence_id,
+        uploaded_at=rec.uploaded_at,
+        original_filename=rec.original_filename,
+        sha256_hash=rec.sha256_hash,
+        storage_backend=rec.storage_backend,
+        storage_path=rec.storage_path,
+        file_size_bytes=rec.file_size_bytes,
+        ingestion_status=rec.ingestion_status,
+        analysis_status=rec.analysis_status,
+    )
 
 
 @app.post("/detections/analyze")

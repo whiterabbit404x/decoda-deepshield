@@ -46,6 +46,7 @@ class DBRepository:
             organization_id=self.DEFAULT_ORGANIZATION_ID,
             workspace_id=self.DEFAULT_WORKSPACE_ID,
             filename=record.filename,
+            original_filename=record.original_filename,
             content_type=record.content_type,
             source=record.source,
             storage_backend=record.storage_backend,
@@ -68,6 +69,7 @@ class DBRepository:
         return EvidenceRecord(
             evidence_id=evidence.evidence_id,
             filename=evidence.filename,
+            original_filename=evidence.original_filename,
             content_type=evidence.content_type,
             source=evidence.source,
             storage_backend=evidence.storage_backend,
@@ -86,6 +88,7 @@ class DBRepository:
         return EvidenceRecord(
             evidence_id=evidence.evidence_id,
             filename=evidence.filename,
+            original_filename=evidence.original_filename,
             content_type=evidence.content_type,
             source=evidence.source,
             storage_backend=evidence.storage_backend,
@@ -275,6 +278,7 @@ class DBRepository:
 
         return {
             "evidence_id": evidence_id,
+            "evidence": evidence.model_dump(),
             "detection_result": (
                 DetectionResult(
                     evidence_id=detection.evidence_id,
