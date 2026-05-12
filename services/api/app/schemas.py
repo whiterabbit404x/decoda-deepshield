@@ -4,11 +4,10 @@ from datetime import datetime, timezone
 from typing import List, Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 
 RiskLevel = Literal["low", "medium", "high"]
-
 
 MVP_DISCLAIMER = (
     "DeepShield MVP provides deterministic decision-support only. "
@@ -24,15 +23,41 @@ def utcnow_iso() -> str:
 class EvidenceRecord(BaseModel):
     evidence_id: str = Field(default_factory=lambda: str(uuid4()))
     filename: str
+    original_filename: str | None = None
     content_type: str | None = None
     source: str | None = None
+    storage_backend: str = "local"
+    storage_path: str | None = None
+    file_size_bytes: int = 0
+    sha256_hash: str | None = None
+    ingestion_status: str = "ingested"
+    analysis_status: str = "pending"
     uploaded_at: str = Field(default_factory=utcnow_iso)
 
 
 class UploadRequest(BaseModel):
     filename: str
+    original_filename: str | None = None
     content_type: str | None = None
     source: str | None = None
+    storage_backend: str = "test"
+    storage_path: str | None = None
+    file_size_bytes: int = 0
+    sha256_hash: str | None = None
+    ingestion_status: str = "ingested"
+    analysis_status: str = "pending"
+
+
+class UploadResponse(BaseModel):
+    evidence_id: str
+    uploaded_at: str
+    original_filename: str | None = None
+    storage_backend: str
+    storage_path: str | None = None
+    file_size_bytes: int
+    sha256_hash: str | None = None
+    ingestion_status: str
+    analysis_status: str
 
 
 class DetectionRequest(BaseModel):
@@ -46,8 +71,14 @@ class DetectionResult(BaseModel):
     reason_codes: List[str]
     recommended_action: str
     created_at: str = Field(default_factory=utcnow_iso)
+    analyzer_version: str = "sim-hash-v1"
     decision_support_disclaimer: str = MVP_DISCLAIMER
-    simulated_model_version: str = "sim-hash-v1"
+
+    @computed_field(return_type=str)
+    @property
+    def simulated_model_version(self) -> str:
+        """Backward-compatible alias for legacy API clients/tests."""
+        return self.analyzer_version
 
 
 class AlertRecord(BaseModel):

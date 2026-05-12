@@ -1,10 +1,50 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Dict, List
+from uuid import uuid4
+
+from fastapi import UploadFile
 
 from .schemas import MVP_DISCLAIMER, AlertRecord, DetectionResult, EvidenceRecord, IncidentRecord, utcnow_iso
+
+
+class LocalEvidenceStorage:
+    def __init__(self, uploads_dir: Path):
+        self.uploads_dir = uploads_dir
+
+    def persist_upload(self, upload: UploadFile) -> dict:
+        self.uploads_dir.mkdir(parents=True, exist_ok=True)
+
+        original_name = Path(upload.filename or "upload.bin").name
+        suffix = Path(original_name).suffix
+        stored_name = f"{Path(original_name).stem}-{uuid4().hex}{suffix}"
+        destination = self.uploads_dir / stored_name
+
+        hasher = hashlib.sha256()
+        total_size = 0
+
+        with destination.open("wb") as out:
+            while True:
+                chunk = upload.file.read(1024 * 1024)
+                if not chunk:
+                    break
+                out.write(chunk)
+                hasher.update(chunk)
+                total_size += len(chunk)
+
+        upload.file.close()
+
+        return {
+            "original_filename": original_name,
+            "content_type": upload.content_type,
+            "storage_backend": "local",
+            "storage_path": str(destination),
+            "file_size_bytes": total_size,
+            "sha256_hash": hasher.hexdigest(),
+        }
 
 
 class JsonStore:

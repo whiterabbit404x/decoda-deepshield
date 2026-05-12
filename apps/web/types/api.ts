@@ -44,6 +44,7 @@ export interface RuntimeStatus {
 
 export interface EvidenceUploadResponse {
   evidence_id: string;
+  sha256_hash: string;
   uploaded_at: string;
 }
 

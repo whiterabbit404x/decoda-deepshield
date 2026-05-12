@@ -9,6 +9,16 @@ import {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 const DEFAULT_TIMEOUT_MS = 12_000;
+const WORKSPACE_HEADER = "X-Workspace-Id";
+
+function getWorkspaceId() {
+  if (typeof window !== "undefined") {
+    const runtimeWorkspace = window.localStorage.getItem("workspaceId");
+    if (runtimeWorkspace) return runtimeWorkspace;
+  }
+
+  return process.env.NEXT_PUBLIC_WORKSPACE_ID ?? "default";
+}
 
 export class ApiError extends Error {
   status?: number;
@@ -35,7 +45,8 @@ export async function fetchJson<T>(
       signal: controller.signal,
       headers: {
         Accept: "application/json",
-        ...(init.body ? { "Content-Type": "application/json" } : {}),
+        ...(init.body && !(init.body instanceof FormData) ? { "Content-Type": "application/json" } : {}),
+        [WORKSPACE_HEADER]: getWorkspaceId(),
         ...init.headers
       }
     });
@@ -67,13 +78,12 @@ export const getIncidents = () => fetchJson<Incident[]>("/incidents");
 export const getRuntimeStatus = () => fetchJson<RuntimeStatus>("/runtime/status");
 
 export function uploadEvidence(file: File) {
+  const formData = new FormData();
+  formData.append("file", file);
+
   return fetchJson<EvidenceUploadResponse>("/evidence/upload", {
     method: "POST",
-    body: JSON.stringify({
-      filename: file.name,
-      content_type: file.type || null,
-      source: "dashboard"
-    })
+    body: formData
   });
 }
 
