@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 
-from .schemas import DetectionResult
+from .schemas import DetectionResult, MVP_DISCLAIMER
+
+SIMULATED_MODEL_VERSION = "sim-hash-v1"
 
 
 def analyze_evidence(evidence_id: str) -> DetectionResult:
@@ -28,4 +30,6 @@ def analyze_evidence(evidence_id: str) -> DetectionResult:
         risk_level=level,
         reason_codes=reasons,
         recommended_action=action,
+        decision_support_disclaimer=MVP_DISCLAIMER,
+        simulated_model_version=SIMULATED_MODEL_VERSION,
     )

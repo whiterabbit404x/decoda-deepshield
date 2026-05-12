@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Alert, AuditEvent, Detection, Evidence, Incident
 from app.schemas import MVP_DISCLAIMER, AlertRecord, DetectionResult, EvidenceRecord, IncidentRecord, utcnow_iso
+from app.detection import SIMULATED_MODEL_VERSION
 
 
 class DBRepository:
@@ -19,6 +20,26 @@ class DBRepository:
     def _iso(dt):
         return dt.astimezone(timezone.utc).isoformat() if dt else utcnow_iso()
 
+    def _add_audit_event(
+        self,
+        event_type: str,
+        entity_type: str,
+        entity_id: str,
+        workspace_id: str | None = None,
+        actor_id: str | None = None,
+        metadata_json: dict | None = None,
+    ) -> None:
+        event = AuditEvent(
+            audit_event_id=str(uuid4()),
+            workspace_id=workspace_id or self.DEFAULT_WORKSPACE_ID,
+            actor_id=actor_id,
+            event_type=event_type,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            metadata_json=metadata_json,
+        )
+        self.db.add(event)
+
     def create_evidence(self, record: EvidenceRecord) -> EvidenceRecord:
         evidence = Evidence(
             evidence_id=record.evidence_id,
@@ -29,6 +50,13 @@ class DBRepository:
             source=record.source,
         )
         self.db.add(evidence)
+        self._add_audit_event(
+            event_type="evidence_uploaded",
+            entity_type="evidence",
+            entity_id=evidence.evidence_id,
+            workspace_id=evidence.workspace_id,
+            metadata_json={"evidence_id": evidence.evidence_id},
+        )
         self.db.commit()
         self.db.refresh(evidence)
         return EvidenceRecord(
@@ -61,6 +89,12 @@ class DBRepository:
             recommended_action=result.recommended_action,
         )
         self.db.add(detection)
+        self._add_audit_event(
+            event_type="detection_generated",
+            entity_type="detection",
+            entity_id=detection.detection_id,
+            metadata_json={"evidence_id": detection.evidence_id, "detection_id": detection.detection_id},
+        )
         self.db.commit()
         self.db.refresh(detection)
         return DetectionResult(
@@ -71,6 +105,7 @@ class DBRepository:
             recommended_action=detection.recommended_action,
             created_at=self._iso(detection.created_at),
             decision_support_disclaimer=MVP_DISCLAIMER,
+            simulated_model_version=SIMULATED_MODEL_VERSION,
         )
 
     def create_alert(self, alert: AlertRecord) -> AlertRecord:
@@ -84,6 +119,12 @@ class DBRepository:
             status=alert.status,
         )
         self.db.add(db_alert)
+        self._add_audit_event(
+            event_type="alert_created",
+            entity_type="alert",
+            entity_id=db_alert.alert_id,
+            metadata_json={"evidence_id": db_alert.evidence_id, "alert_id": db_alert.alert_id},
+        )
         self.db.commit()
         self.db.refresh(db_alert)
         return AlertRecord(
@@ -124,6 +165,16 @@ class DBRepository:
             audit_trail=incident.audit_trail,
         )
         self.db.add(db_incident)
+        self._add_audit_event(
+            event_type="incident_created",
+            entity_type="incident",
+            entity_id=db_incident.incident_id,
+            metadata_json={
+                "incident_id": db_incident.incident_id,
+                "alert_id": db_incident.alert_id,
+                "evidence_id": db_incident.evidence_id,
+            },
+        )
         self.db.commit()
         self.db.refresh(db_incident)
         return IncidentRecord(
@@ -155,25 +206,21 @@ class DBRepository:
 
     def create_audit_event(
         self,
-        organization_id: str,
-        action: str,
+        event_type: str,
         entity_type: str,
         entity_id: str,
         workspace_id: str | None = None,
-        user_id: str | None = None,
-        metadata: dict | None = None,
+        actor_id: str | None = None,
+        metadata_json: dict | None = None,
     ) -> None:
-        event = AuditEvent(
-            audit_event_id=str(uuid4()),
-            organization_id=organization_id,
-            workspace_id=workspace_id,
-            user_id=user_id,
-            action=action,
+        self._add_audit_event(
+            event_type=event_type,
             entity_type=entity_type,
             entity_id=entity_id,
-            metadata=metadata,
+            workspace_id=workspace_id,
+            actor_id=actor_id,
+            metadata_json=metadata_json,
         )
-        self.db.add(event)
         self.db.commit()
 
     def export_evidence_package(self, evidence_id: str) -> dict:
@@ -195,6 +242,19 @@ class DBRepository:
             .first()
         )
 
+        self._add_audit_event(
+            event_type="evidence_exported",
+            entity_type="evidence",
+            entity_id=evidence_id,
+            metadata_json={
+                "evidence_id": evidence_id,
+                "detection_id": detection.detection_id if detection else None,
+                "alert_id": alert.alert_id if alert else None,
+                "incident_id": incident.incident_id if incident else None,
+            },
+        )
+        self.db.commit()
+
         return {
             "evidence_id": evidence_id,
             "detection_result": (
@@ -205,6 +265,8 @@ class DBRepository:
                     reason_codes=detection.reason_codes,
                     recommended_action=detection.recommended_action,
                     created_at=self._iso(detection.created_at),
+                    decision_support_disclaimer=MVP_DISCLAIMER,
+                    simulated_model_version=SIMULATED_MODEL_VERSION,
                 ).model_dump()
                 if detection
                 else None

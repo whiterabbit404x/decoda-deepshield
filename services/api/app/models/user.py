@@ -17,4 +17,4 @@ class User(UUIDTimestampMixin, Base):
     name = Column(String, nullable=True)
 
     organization = relationship("Organization", back_populates="users")
-    audit_events = relationship("AuditEvent", back_populates="user")
+    audit_events = relationship("AuditEvent", back_populates="actor")
