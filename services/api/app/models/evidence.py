@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import Column, ForeignKey, Index, String
+from sqlalchemy import Column, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
@@ -17,6 +17,12 @@ class Evidence(UUIDTimestampMixin, Base):
     filename = Column(String, nullable=False)
     content_type = Column(String, nullable=True)
     source = Column(String, nullable=True)
+    storage_backend = Column(String, nullable=False, default="local")
+    storage_path = Column(String, nullable=True)
+    file_size_bytes = Column(Integer, nullable=False, default=0)
+    sha256_hash = Column(String, nullable=True)
+    ingestion_status = Column(String, nullable=False, default="ingested")
+    analysis_status = Column(String, nullable=False, default="pending")
 
     workspace = relationship("Workspace", back_populates="evidence_items")
     detections = relationship("Detection", back_populates="evidence")

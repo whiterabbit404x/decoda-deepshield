@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import uvicorn
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from sqlalchemy import func, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -12,6 +13,7 @@ from .db import Base, engine, get_db
 from .detection import analyze_evidence
 from .models import Alert, Detection, Evidence, Incident, Organization, Workspace
 from .repositories import DBRepository
+from .storage import LocalEvidenceStorage
 from .schemas import AlertRecord, DetectionRequest, EvidenceRecord, IncidentRecord, UploadRequest
 
 app = FastAPI(title="DeepShield API", version="0.1.0")
@@ -99,9 +101,66 @@ def runtime_status(db: Session = Depends(get_db)) -> dict:
 
 
 @app.post("/evidence/upload")
-def upload_evidence(payload: UploadRequest, db: Session = Depends(get_db)) -> dict:
-    rec = DBRepository(db).create_evidence(EvidenceRecord(**payload.model_dump()))
-    return {"evidence_id": rec.evidence_id, "uploaded_at": rec.uploaded_at}
+async def upload_evidence(
+    request: Request,
+    file: UploadFile | None = File(default=None),
+    filename: str | None = Form(default=None),
+    content_type: str | None = Form(default=None),
+    source: str | None = Form(default=None),
+    db: Session = Depends(get_db),
+) -> dict:
+    upload_filename = filename
+    upload_content_type = content_type
+    storage_metadata = {
+        "storage_backend": "test",
+        "storage_path": source,
+        "file_size_bytes": 0,
+        "sha256_hash": None,
+    }
+
+    # Backward-compatible JSON fallback for tests/non-multipart callers.
+    if file is None and request.headers.get("content-type", "").startswith("application/json"):
+        payload = UploadRequest(**(await request.json()))
+        upload_filename = payload.filename
+        upload_content_type = payload.content_type
+        source = payload.source
+        storage_metadata["storage_path"] = payload.source
+
+    if file is not None:
+        storage = LocalEvidenceStorage(Path(__file__).resolve().parents[1] / "uploads")
+        saved = storage.persist_upload(file)
+        upload_filename = saved["original_filename"]
+        upload_content_type = saved["content_type"] or upload_content_type
+        storage_metadata = {
+            "storage_backend": saved["storage_backend"],
+            "storage_path": saved["storage_path"],
+            "file_size_bytes": saved["file_size_bytes"],
+            "sha256_hash": saved["sha256_hash"],
+        }
+    elif not upload_filename:
+        raise HTTPException(status_code=422, detail="multipart file is required unless test metadata fallback is provided")
+
+    rec = DBRepository(db).create_evidence(
+        EvidenceRecord(
+            filename=upload_filename,
+            content_type=upload_content_type,
+            source=source,
+            storage_backend=storage_metadata["storage_backend"],
+            storage_path=storage_metadata["storage_path"],
+            file_size_bytes=storage_metadata["file_size_bytes"],
+            sha256_hash=storage_metadata["sha256_hash"],
+            ingestion_status="ingested",
+            analysis_status="pending",
+        )
+    )
+    return {
+        "evidence_id": rec.evidence_id,
+        "uploaded_at": rec.uploaded_at,
+        "sha256_hash": rec.sha256_hash,
+        "storage_backend": rec.storage_backend,
+        "storage_path": rec.storage_path,
+        "file_size_bytes": rec.file_size_bytes,
+    }
 
 
 @app.post("/detections/analyze")
