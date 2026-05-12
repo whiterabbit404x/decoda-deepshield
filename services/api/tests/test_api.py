@@ -192,12 +192,39 @@ def test_audit_events_include_required_types(client: TestClient) -> None:
 
     required = {
         "evidence_uploaded",
+        "evidence_file_hashed",
+        "analysis_job_created",
         "detection_generated",
         "alert_created",
         "incident_created",
         "evidence_exported",
     }
     assert required.issubset(event_types)
+
+
+def test_audit_events_include_required_metadata_and_workspace_scope(client: TestClient) -> None:
+    upload, _ = _upload_and_analyze_until_level(client, {"medium", "high"})
+
+    db_gen = app.dependency_overrides[get_db]()
+    db = next(db_gen)
+    try:
+        events = db.query(AuditEvent).all()
+    finally:
+        db.close()
+
+    assert events
+    for event in events:
+        assert event.workspace_id == WORKSPACE_ID
+        assert event.metadata_json["workspace_id"] == WORKSPACE_ID
+
+    hashed_event = next(event for event in events if event.event_type == "evidence_file_hashed")
+    assert hashed_event.metadata_json["evidence_id"] == upload["evidence_id"]
+    assert hashed_event.metadata_json["workspace_id"] == WORKSPACE_ID
+
+    job_event = next(event for event in events if event.event_type == "analysis_job_created")
+    assert job_event.metadata_json["job_id"] == job_event.entity_id
+    assert job_event.metadata_json["evidence_id"] == upload["evidence_id"]
+    assert job_event.metadata_json["workspace_id"] == WORKSPACE_ID
 
 
 def test_persistence_across_repository_sessions(client: TestClient) -> None:
