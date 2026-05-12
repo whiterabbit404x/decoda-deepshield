@@ -22,6 +22,31 @@ export function DashboardClient({ health, runtimeStatus, alerts: initialAlerts, 
   const [period, setPeriod] = useState("30");
 
   const periodLabel = useMemo(() => `Last ${period} days`, [period]);
+  const refreshAllDashboardData = async () => {
+    const [alertsResult, incidentsResult, runtimeStatusResult] = await Promise.allSettled([
+      getAlerts(),
+      getIncidents(),
+      getRuntimeStatus(),
+    ]);
+
+    if (alertsResult.status === "fulfilled") {
+      setAlerts(alertsResult.value);
+      setAlertsError(undefined);
+    } else {
+      setAlertsError(alertsResult.reason?.message ?? "Failed");
+    }
+
+    if (incidentsResult.status === "fulfilled") {
+      setIncidents(incidentsResult.value);
+      setIncidentsError(undefined);
+    } else {
+      setIncidentsError(incidentsResult.reason?.message ?? "Failed");
+    }
+
+    if (runtimeStatusResult.status === "fulfilled") {
+      setCurrentRuntimeStatus(runtimeStatusResult.value);
+    }
+  };
 
   return (
     <>
@@ -30,23 +55,12 @@ export function DashboardClient({ health, runtimeStatus, alerts: initialAlerts, 
         <select id="period" className="period-filter" value={period} onChange={(e) => setPeriod(e.target.value)} aria-label="Filter dashboard period">
           <option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option>
         </select>
-        <button className="upload-btn refresh-btn" onClick={async () => {
-          const [a, i] = await Promise.allSettled([getAlerts(), getIncidents()]);
-          if (a.status === "fulfilled") { setAlerts(a.value); setAlertsError(undefined); } else setAlertsError(a.reason?.message ?? "Failed");
-          if (i.status === "fulfilled") { setIncidents(i.value); setIncidentsError(undefined); } else setIncidentsError(i.reason?.message ?? "Failed");
-        }}>Refresh</button>
+        <button className="upload-btn refresh-btn" onClick={refreshAllDashboardData}>Refresh</button>
       </section>
       <StatCards health={health} runtimeStatus={currentRuntimeStatus} alerts={alerts} incidents={incidents} />
       <section className="middle-grid">
         <RiskTrendChart periodLabel={periodLabel} />
-        <UploadPanel onDetections={setDetections} onRefreshRuntimeStatus={async () => {
-          try {
-            const latestRuntime = await getRuntimeStatus();
-            setCurrentRuntimeStatus(latestRuntime);
-          } catch {
-            // leave existing runtime status in place
-          }
-        }} />
+        <UploadPanel onDetections={setDetections} onRefreshDashboardData={refreshAllDashboardData} />
       </section>
       <section className="lower-grid">
         <DataTables detections={detections} incidents={incidents} incidentsError={incidentsError} onRetryIncidents={async () => {

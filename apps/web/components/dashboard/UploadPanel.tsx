@@ -7,13 +7,13 @@ import { type DetectionOutput } from "@/types/api";
 
 interface UploadPanelProps {
   onDetections: (detections: DetectionOutput[]) => void;
-  onRefreshRuntimeStatus: () => Promise<void>;
+  onRefreshDashboardData: () => Promise<void>;
 }
 
 const MAX_SIZE = 50 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = [".json", ".csv", ".pcap", ".pcapng"];
 
-export function UploadPanel({ onDetections, onRefreshRuntimeStatus }: UploadPanelProps) {
+export function UploadPanel({ onDetections, onRefreshDashboardData }: UploadPanelProps) {
   const [uploadStatus, setUploadStatus] = useState("");
   const [analysisStatus, setAnalysisStatus] = useState("");
   const [evidenceId, setEvidenceId] = useState<string | null>(null);
@@ -56,7 +56,7 @@ export function UploadPanel({ onDetections, onRefreshRuntimeStatus }: UploadPane
       setEvidenceId(result.evidence_id);
       setSha256Hash(result.sha256_hash);
       setUploadStatus("Upload successful");
-      await onRefreshRuntimeStatus();
+      await onRefreshDashboardData();
     } catch (error) {
       setUploadStatus("");
       setApiError(error instanceof Error ? `API error: ${error.message}` : "API error: Upload failed");
@@ -81,7 +81,7 @@ export function UploadPanel({ onDetections, onRefreshRuntimeStatus }: UploadPane
       const result = await analyzeDetections(evidenceId);
       onDetections([result]);
       setAnalysisStatus("Detection completed");
-      await onRefreshRuntimeStatus();
+      await onRefreshDashboardData();
     } catch (error) {
       setAnalysisStatus("");
       setApiError(error instanceof Error ? `API error: ${error.message}` : "API error: Analysis failed");
