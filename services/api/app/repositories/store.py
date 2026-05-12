@@ -40,11 +40,11 @@ class DBRepository:
         )
         self.db.add(event)
 
-    def create_evidence(self, record: EvidenceRecord) -> EvidenceRecord:
+    def create_evidence(self, record: EvidenceRecord, workspace_id: str) -> EvidenceRecord:
         evidence = Evidence(
             evidence_id=record.evidence_id,
             organization_id=self.DEFAULT_ORGANIZATION_ID,
-            workspace_id=self.DEFAULT_WORKSPACE_ID,
+            workspace_id=workspace_id,
             filename=record.filename,
             original_filename=record.original_filename,
             content_type=record.content_type,
@@ -81,8 +81,12 @@ class DBRepository:
             uploaded_at=self._iso(evidence.created_at),
         )
 
-    def get_evidence(self, evidence_id: str) -> EvidenceRecord | None:
-        evidence = self.db.query(Evidence).filter(Evidence.evidence_id == evidence_id).first()
+    def get_evidence(self, evidence_id: str, workspace_id: str) -> EvidenceRecord | None:
+        evidence = (
+            self.db.query(Evidence)
+            .filter(Evidence.evidence_id == evidence_id, Evidence.workspace_id == workspace_id)
+            .first()
+        )
         if not evidence:
             return None
         return EvidenceRecord(
@@ -100,7 +104,14 @@ class DBRepository:
             uploaded_at=self._iso(evidence.created_at),
         )
 
-    def save_detection(self, result: DetectionResult) -> DetectionResult:
+    def save_detection(self, result: DetectionResult, workspace_id: str) -> DetectionResult:
+        evidence = (
+            self.db.query(Evidence)
+            .filter(Evidence.evidence_id == result.evidence_id, Evidence.workspace_id == workspace_id)
+            .first()
+        )
+        if not evidence:
+            raise KeyError(result.evidence_id)
         detection = Detection(
             detection_id=str(uuid4()),
             evidence_id=result.evidence_id,
@@ -114,6 +125,7 @@ class DBRepository:
             event_type="detection_generated",
             entity_type="detection",
             entity_id=detection.detection_id,
+            workspace_id=workspace_id,
             metadata_json={"evidence_id": detection.evidence_id, "detection_id": detection.detection_id},
         )
         self.db.commit()
@@ -152,7 +164,14 @@ class DBRepository:
             job.error_message = error_message
         self.db.commit()
 
-    def create_alert(self, alert: AlertRecord) -> AlertRecord:
+    def create_alert(self, alert: AlertRecord, workspace_id: str) -> AlertRecord:
+        evidence = (
+            self.db.query(Evidence)
+            .filter(Evidence.evidence_id == alert.evidence_id, Evidence.workspace_id == workspace_id)
+            .first()
+        )
+        if not evidence:
+            raise KeyError(alert.evidence_id)
         db_alert = Alert(
             alert_id=alert.alert_id,
             evidence_id=alert.evidence_id,
@@ -167,6 +186,7 @@ class DBRepository:
             event_type="alert_created",
             entity_type="alert",
             entity_id=db_alert.alert_id,
+            workspace_id=workspace_id,
             metadata_json={"evidence_id": db_alert.evidence_id, "alert_id": db_alert.alert_id},
         )
         self.db.commit()
@@ -182,8 +202,14 @@ class DBRepository:
             created_at=self._iso(db_alert.created_at),
         )
 
-    def list_alerts(self) -> list[AlertRecord]:
-        alerts = self.db.query(Alert).order_by(Alert.created_at.desc()).all()
+    def list_alerts(self, workspace_id: str) -> list[AlertRecord]:
+        alerts = (
+            self.db.query(Alert)
+            .join(Evidence, Evidence.evidence_id == Alert.evidence_id)
+            .filter(Evidence.workspace_id == workspace_id)
+            .order_by(Alert.created_at.desc())
+            .all()
+        )
         return [
             AlertRecord(
                 alert_id=a.alert_id,
@@ -198,7 +224,14 @@ class DBRepository:
             for a in alerts
         ]
 
-    def create_incident(self, incident: IncidentRecord) -> IncidentRecord:
+    def create_incident(self, incident: IncidentRecord, workspace_id: str) -> IncidentRecord:
+        evidence = (
+            self.db.query(Evidence)
+            .filter(Evidence.evidence_id == incident.evidence_id, Evidence.workspace_id == workspace_id)
+            .first()
+        )
+        if not evidence:
+            raise KeyError(incident.evidence_id)
         db_incident = Incident(
             incident_id=incident.incident_id,
             alert_id=incident.alert_id,
@@ -213,6 +246,7 @@ class DBRepository:
             event_type="incident_created",
             entity_type="incident",
             entity_id=db_incident.incident_id,
+            workspace_id=workspace_id,
             metadata_json={
                 "incident_id": db_incident.incident_id,
                 "alert_id": db_incident.alert_id,
@@ -232,8 +266,14 @@ class DBRepository:
             audit_trail=db_incident.audit_trail,
         )
 
-    def list_incidents(self) -> list[IncidentRecord]:
-        incidents = self.db.query(Incident).order_by(Incident.created_at.desc()).all()
+    def list_incidents(self, workspace_id: str) -> list[IncidentRecord]:
+        incidents = (
+            self.db.query(Incident)
+            .join(Evidence, Evidence.evidence_id == Incident.evidence_id)
+            .filter(Evidence.workspace_id == workspace_id)
+            .order_by(Incident.created_at.desc())
+            .all()
+        )
         return [
             IncidentRecord(
                 incident_id=i.incident_id,
@@ -267,21 +307,29 @@ class DBRepository:
         )
         self.db.commit()
 
-    def export_evidence_package(self, evidence_id: str) -> dict:
-        evidence = self.get_evidence(evidence_id)
+    def export_evidence_package(self, evidence_id: str, workspace_id: str) -> dict:
+        evidence = self.get_evidence(evidence_id, workspace_id)
         if not evidence:
             raise KeyError(evidence_id)
 
         detection = (
             self.db.query(Detection)
-            .filter(Detection.evidence_id == evidence_id)
+            .join(Evidence, Evidence.evidence_id == Detection.evidence_id)
+            .filter(Detection.evidence_id == evidence_id, Evidence.workspace_id == workspace_id)
             .order_by(Detection.created_at.desc())
             .first()
         )
-        alert = self.db.query(Alert).filter(Alert.evidence_id == evidence_id).order_by(Alert.created_at.desc()).first()
+        alert = (
+            self.db.query(Alert)
+            .join(Evidence, Evidence.evidence_id == Alert.evidence_id)
+            .filter(Alert.evidence_id == evidence_id, Evidence.workspace_id == workspace_id)
+            .order_by(Alert.created_at.desc())
+            .first()
+        )
         incident = (
             self.db.query(Incident)
-            .filter(Incident.evidence_id == evidence_id)
+            .join(Evidence, Evidence.evidence_id == Incident.evidence_id)
+            .filter(Incident.evidence_id == evidence_id, Evidence.workspace_id == workspace_id)
             .order_by(Incident.created_at.desc())
             .first()
         )
@@ -290,6 +338,7 @@ class DBRepository:
             event_type="evidence_exported",
             entity_type="evidence",
             entity_id=evidence_id,
+            workspace_id=workspace_id,
             metadata_json={
                 "evidence_id": evidence_id,
                 "detection_id": detection.detection_id if detection else None,
