@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from .db import Base, engine, get_db
 from .analyzers.base import EvidenceAnalyzer
 from .analyzers.simulated import SimulatedEvidenceAnalyzer
-from .models import Alert, Detection, Evidence, Incident, Organization, Workspace
+from .models import Alert, AnalysisJob, Detection, Evidence, Incident, Organization, Workspace
 from .repositories import DBRepository
 from .storage import LocalEvidenceStorage
 from .schemas import AlertRecord, DetectionRequest, EvidenceRecord, IncidentRecord, UploadRequest, UploadResponse
@@ -186,33 +186,41 @@ def run_detection(
     if not evidence:
         raise HTTPException(status_code=404, detail="evidence not found")
 
-    detection = repo.save_detection(analyzer.analyze(evidence))
+    job = repo.create_analysis_job(evidence_id=evidence.evidence_id, workspace_id=DBRepository.DEFAULT_WORKSPACE_ID)
 
-    if detection.risk_level in {"medium", "high"}:
-        alert = repo.create_alert(
-            AlertRecord(
-                evidence_id=detection.evidence_id,
-                severity=detection.risk_level,
-                synthetic_risk_score=detection.synthetic_risk_score,
-                reason_codes=detection.reason_codes,
-                recommended_action=detection.recommended_action,
+    try:
+        detection = repo.save_detection(analyzer.analyze(evidence))
+
+        if detection.risk_level in {"medium", "high"}:
+            alert = repo.create_alert(
+                AlertRecord(
+                    evidence_id=detection.evidence_id,
+                    severity=detection.risk_level,
+                    synthetic_risk_score=detection.synthetic_risk_score,
+                    reason_codes=detection.reason_codes,
+                    recommended_action=detection.recommended_action,
+                )
             )
-        )
-        repo.create_incident(
-            IncidentRecord(
-                alert_id=alert.alert_id,
-                evidence_id=detection.evidence_id,
-                priority="high" if detection.risk_level == "high" else "medium",
-                summary=(
-                    f"{detection.risk_level.title()} synthetic-risk evidence requires analyst review"
-                ),
-                audit_trail=[
-                    "detection_result_generated",
-                    "alert_auto_created",
-                    "incident_auto_opened",
-                ],
+            repo.create_incident(
+                IncidentRecord(
+                    alert_id=alert.alert_id,
+                    evidence_id=detection.evidence_id,
+                    priority="high" if detection.risk_level == "high" else "medium",
+                    summary=(
+                        f"{detection.risk_level.title()} synthetic-risk evidence requires analyst review"
+                    ),
+                    audit_trail=[
+                        "detection_result_generated",
+                        "alert_auto_created",
+                        "incident_auto_opened",
+                    ],
+                )
             )
-        )
+
+        repo.complete_analysis_job(job.job_id, status="completed")
+    except Exception as exc:
+        repo.complete_analysis_job(job.job_id, status="failed", error_message=str(exc))
+        raise
 
     return detection.model_dump()
 
