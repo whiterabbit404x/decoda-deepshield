@@ -179,7 +179,19 @@ def test_low_risk_does_not_create_alert_or_incident(client: TestClient) -> None:
 
 
 def test_audit_events_include_required_types(client: TestClient) -> None:
-    upload, _ = _upload_and_analyze_until_level(client, {"medium", "high"})
+    upload_resp = client.post(
+        "/evidence/upload",
+        files={"file": ("sample.bin", b"sample-bytes-for-hash", "application/octet-stream")},
+        headers=WORKSPACE_HEADERS,
+    )
+    assert upload_resp.status_code == 200
+    upload = upload_resp.json()
+    analysis = client.post(
+        "/detections/analyze",
+        json={"evidence_id": upload["evidence_id"]},
+        headers=WORKSPACE_HEADERS,
+    )
+    assert analysis.status_code == 200
     export_resp = client.get(f"/evidence/{upload['evidence_id']}/export", headers=WORKSPACE_HEADERS)
     assert export_resp.status_code == 200
 
@@ -192,12 +204,51 @@ def test_audit_events_include_required_types(client: TestClient) -> None:
 
     required = {
         "evidence_uploaded",
+        "evidence_file_hashed",
+        "analysis_job_created",
         "detection_generated",
         "alert_created",
         "incident_created",
         "evidence_exported",
     }
     assert required.issubset(event_types)
+
+
+def test_audit_events_include_required_metadata_and_workspace_scope(client: TestClient) -> None:
+    upload_resp = client.post(
+        "/evidence/upload",
+        files={"file": ("sample.bin", b"sample-bytes-for-hash", "application/octet-stream")},
+        headers=WORKSPACE_HEADERS,
+    )
+    assert upload_resp.status_code == 200
+    upload = upload_resp.json()
+    analysis = client.post(
+        "/detections/analyze",
+        json={"evidence_id": upload["evidence_id"]},
+        headers=WORKSPACE_HEADERS,
+    )
+    assert analysis.status_code == 200
+
+    db_gen = app.dependency_overrides[get_db]()
+    db = next(db_gen)
+    try:
+        events = db.query(AuditEvent).all()
+    finally:
+        db.close()
+
+    assert events
+    for event in events:
+        assert event.workspace_id == WORKSPACE_ID
+        assert event.metadata_json["workspace_id"] == WORKSPACE_ID
+
+    hashed_event = next(event for event in events if event.event_type == "evidence_file_hashed")
+    assert hashed_event.metadata_json["evidence_id"] == upload["evidence_id"]
+    assert hashed_event.metadata_json["workspace_id"] == WORKSPACE_ID
+
+    job_event = next(event for event in events if event.event_type == "analysis_job_created")
+    assert job_event.metadata_json["job_id"] == job_event.entity_id
+    assert job_event.metadata_json["evidence_id"] == upload["evidence_id"]
+    assert job_event.metadata_json["workspace_id"] == WORKSPACE_ID
 
 
 def test_persistence_across_repository_sessions(client: TestClient) -> None:

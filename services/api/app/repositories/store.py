@@ -25,18 +25,20 @@ class DBRepository:
         event_type: str,
         entity_type: str,
         entity_id: str,
-        workspace_id: str | None = None,
+        workspace_id: str,
         actor_id: str | None = None,
         metadata_json: dict | None = None,
     ) -> None:
+        event_metadata = dict(metadata_json or {})
+        event_metadata.setdefault("workspace_id", workspace_id)
         event = AuditEvent(
             audit_event_id=str(uuid4()),
-            workspace_id=workspace_id or self.DEFAULT_WORKSPACE_ID,
+            workspace_id=workspace_id,
             actor_id=actor_id,
             event_type=event_type,
             entity_type=entity_type,
             entity_id=entity_id,
-            metadata_json=metadata_json,
+            metadata_json=event_metadata,
         )
         self.db.add(event)
 
@@ -64,6 +66,14 @@ class DBRepository:
             workspace_id=evidence.workspace_id,
             metadata_json={"evidence_id": evidence.evidence_id, "storage_path": evidence.storage_path},
         )
+        if evidence.sha256_hash:
+            self._add_audit_event(
+                event_type="evidence_file_hashed",
+                entity_type="evidence",
+                entity_id=evidence.evidence_id,
+                workspace_id=evidence.workspace_id,
+                metadata_json={"evidence_id": evidence.evidence_id, "sha256_hash": evidence.sha256_hash},
+            )
         self.db.commit()
         self.db.refresh(evidence)
         return EvidenceRecord(
@@ -150,6 +160,13 @@ class DBRepository:
             started_at=datetime.now(timezone.utc),
         )
         self.db.add(job)
+        self._add_audit_event(
+            event_type="analysis_job_created",
+            entity_type="analysis_job",
+            entity_id=job.job_id,
+            workspace_id=workspace_id,
+            metadata_json={"job_id": job.job_id, "evidence_id": evidence_id},
+        )
         self.db.commit()
         self.db.refresh(job)
         return job
@@ -293,7 +310,7 @@ class DBRepository:
         event_type: str,
         entity_type: str,
         entity_id: str,
-        workspace_id: str | None = None,
+        workspace_id: str,
         actor_id: str | None = None,
         metadata_json: dict | None = None,
     ) -> None:
