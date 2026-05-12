@@ -60,7 +60,7 @@ export function DashboardClient({ health, runtimeStatus, alerts: initialAlerts, 
       <StatCards health={health} runtimeStatus={currentRuntimeStatus} alerts={alerts} incidents={incidents} />
       <section className="middle-grid">
         <RiskTrendChart periodLabel={periodLabel} />
-        <UploadPanel onDetections={setDetections} onRefreshDashboardData={refreshAllDashboardData} />
+        <UploadPanel onDetections={setDetections} onRefreshRuntimeStatus={refreshAllDashboardData} />
       </section>
       <section className="lower-grid">
         <DataTables detections={detections} incidents={incidents} incidentsError={incidentsError} onRetryIncidents={async () => {
