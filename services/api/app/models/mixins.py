@@ -9,7 +9,7 @@ from sqlalchemy.orm import declared_attr, mapped_column
 class UUIDTimestampMixin:
     @declared_attr
     def created_at(cls):
-        return mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), index=True)
+        return mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     @declared_attr
     def updated_at(cls):
@@ -18,7 +18,6 @@ class UUIDTimestampMixin:
             nullable=False,
             server_default=func.now(),
             onupdate=func.now(),
-            index=True,
         )
 
 
