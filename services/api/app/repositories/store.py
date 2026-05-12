@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from datetime import timezone
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
-from app.models import Alert, AuditEvent, Detection, Evidence, Incident
+from app.models import Alert, AnalysisJob, AuditEvent, Detection, Evidence, Incident
 from app.analyzers.metadata import MVP_DECISION_SUPPORT_DISCLAIMER, SIMULATED_ANALYZER_VERSION
 from app.schemas import AlertRecord, DetectionResult, EvidenceRecord, IncidentRecord, utcnow_iso
 
@@ -128,6 +128,29 @@ class DBRepository:
             analyzer_version=result.analyzer_version or SIMULATED_ANALYZER_VERSION,
             decision_support_disclaimer=result.decision_support_disclaimer or MVP_DECISION_SUPPORT_DISCLAIMER,
         )
+
+    def create_analysis_job(self, evidence_id: str, workspace_id: str) -> AnalysisJob:
+        job = AnalysisJob(
+            job_id=str(uuid4()),
+            evidence_id=evidence_id,
+            workspace_id=workspace_id,
+            status="running",
+            started_at=datetime.now(timezone.utc),
+        )
+        self.db.add(job)
+        self.db.commit()
+        self.db.refresh(job)
+        return job
+
+    def complete_analysis_job(self, job_id: str, status: str, error_message: str | None = None) -> None:
+        job = self.db.query(AnalysisJob).filter(AnalysisJob.job_id == job_id).first()
+        if not job:
+            return
+        job.status = status
+        job.completed_at = datetime.now(timezone.utc)
+        if error_message is not None:
+            job.error_message = error_message
+        self.db.commit()
 
     def create_alert(self, alert: AlertRecord) -> AlertRecord:
         db_alert = Alert(
