@@ -15,6 +15,7 @@ class Evidence(UUIDTimestampMixin, Base):
     organization_id = Column(String(36), ForeignKey("organizations.organization_id"), nullable=False, index=True)
     workspace_id = Column(String(36), ForeignKey("workspaces.workspace_id"), nullable=False, index=True)
     filename = Column(String, nullable=False)
+    original_filename = Column(String, nullable=True)
     content_type = Column(String, nullable=True)
     source = Column(String, nullable=True)
     storage_backend = Column(String, nullable=False, default="local")

@@ -24,6 +24,7 @@ def utcnow_iso() -> str:
 class EvidenceRecord(BaseModel):
     evidence_id: str = Field(default_factory=lambda: str(uuid4()))
     filename: str
+    original_filename: str | None = None
     content_type: str | None = None
     source: str | None = None
     storage_backend: str = "local"
@@ -37,8 +38,27 @@ class EvidenceRecord(BaseModel):
 
 class UploadRequest(BaseModel):
     filename: str
+    original_filename: str | None = None
     content_type: str | None = None
     source: str | None = None
+    storage_backend: str = "test"
+    storage_path: str | None = None
+    file_size_bytes: int = 0
+    sha256_hash: str | None = None
+    ingestion_status: str = "ingested"
+    analysis_status: str = "pending"
+
+
+class UploadResponse(BaseModel):
+    evidence_id: str
+    uploaded_at: str
+    original_filename: str | None = None
+    storage_backend: str
+    storage_path: str | None = None
+    file_size_bytes: int
+    sha256_hash: str | None = None
+    ingestion_status: str
+    analysis_status: str
 
 
 class DetectionRequest(BaseModel):
