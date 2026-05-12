@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 import uvicorn
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from sqlalchemy import func, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -14,7 +14,7 @@ from .detection import analyze_evidence
 from .models import Alert, Detection, Evidence, Incident, Organization, Workspace
 from .repositories import DBRepository
 from .storage import LocalEvidenceStorage
-from .schemas import AlertRecord, DetectionRequest, EvidenceRecord, IncidentRecord
+from .schemas import AlertRecord, DetectionRequest, EvidenceRecord, IncidentRecord, UploadRequest
 
 app = FastAPI(title="DeepShield API", version="0.1.0")
 
@@ -101,7 +101,8 @@ def runtime_status(db: Session = Depends(get_db)) -> dict:
 
 
 @app.post("/evidence/upload")
-def upload_evidence(
+async def upload_evidence(
+    request: Request,
     file: UploadFile | None = File(default=None),
     filename: str | None = Form(default=None),
     content_type: str | None = Form(default=None),
@@ -116,6 +117,14 @@ def upload_evidence(
         "file_size_bytes": 0,
         "sha256_hash": None,
     }
+
+    # Backward-compatible JSON fallback for tests/non-multipart callers.
+    if file is None and request.headers.get("content-type", "").startswith("application/json"):
+        payload = UploadRequest(**(await request.json()))
+        upload_filename = payload.filename
+        upload_content_type = payload.content_type
+        source = payload.source
+        storage_metadata["storage_path"] = payload.source
 
     if file is not None:
         storage = LocalEvidenceStorage(Path(__file__).resolve().parents[1] / "uploads")
