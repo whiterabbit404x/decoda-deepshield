@@ -7,13 +7,13 @@ import { type DetectionOutput } from "@/types/api";
 
 interface UploadPanelProps {
   onDetections: (detections: DetectionOutput[]) => void;
-  onRefreshRuntimeStatus: () => Promise<void>;
+  onRefreshDashboardData: () => Promise<void>;
 }
 
 const MAX_SIZE = 50 * 1024 * 1024;
-const ALLOWED_EXTENSIONS = [".json", ".csv", ".pcap", ".pcapng"];
+const ALLOWED_EXTENSIONS = [".json", ".csv", ".pcap", ".pcapng", ".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".opus", ".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v"];
 
-export function UploadPanel({ onDetections, onRefreshRuntimeStatus }: UploadPanelProps) {
+export function UploadPanel({ onDetections, onRefreshDashboardData }: UploadPanelProps) {
   const [uploadStatus, setUploadStatus] = useState("");
   const [analysisStatus, setAnalysisStatus] = useState("");
   const [evidenceId, setEvidenceId] = useState<string | null>(null);
@@ -31,7 +31,7 @@ export function UploadPanel({ onDetections, onRefreshRuntimeStatus }: UploadPane
     const lowerName = file.name.toLowerCase();
     const extensionAllowed = ALLOWED_EXTENSIONS.some((ext) => lowerName.endsWith(ext));
     const mimeAllowed = file.type.startsWith("audio/") || file.type.startsWith("video/") || file.type === "application/json" || file.type === "text/csv" || file.type === "application/vnd.tcpdump.pcap";
-    if (!extensionAllowed && !mimeAllowed) return "Invalid file type. Use audio, video, JSON, CSV, or PCAP.";
+    if (!extensionAllowed && !mimeAllowed) return "Invalid file type. Use supported audio/video, JSON, CSV, or PCAP files.";
     if (file.size > MAX_SIZE) return "File too large. Max 50 MB.";
     return null;
   };
@@ -56,7 +56,7 @@ export function UploadPanel({ onDetections, onRefreshRuntimeStatus }: UploadPane
       setEvidenceId(result.evidence_id);
       setSha256Hash(result.sha256_hash);
       setUploadStatus("Upload successful");
-      await onRefreshRuntimeStatus();
+      await onRefreshDashboardData();
     } catch (error) {
       setUploadStatus("");
       setApiError(error instanceof Error ? `API error: ${error.message}` : "API error: Upload failed");
@@ -81,7 +81,7 @@ export function UploadPanel({ onDetections, onRefreshRuntimeStatus }: UploadPane
       const result = await analyzeDetections(evidenceId);
       onDetections([result]);
       setAnalysisStatus("Detection completed");
-      await onRefreshRuntimeStatus();
+      await onRefreshDashboardData();
     } catch (error) {
       setAnalysisStatus("");
       setApiError(error instanceof Error ? `API error: ${error.message}` : "API error: Analysis failed");
@@ -108,9 +108,9 @@ export function UploadPanel({ onDetections, onRefreshRuntimeStatus }: UploadPane
         aria-label="Drag and drop files to upload"
       >
         <p>Drag & drop evidence files here</p>
-        <p className="muted">Audio, video, JSON, CSV, PCAP up to 50 MB</p>
+        <p className="muted">Audio/video (e.g. MP3, WAV, M4A, MP4, MOV, MKV, WEBM), JSON, CSV, PCAP up to 50 MB</p>
       </div>
-      <input ref={inputRef} type="file" accept="audio/*,video/*,.json,.csv,.pcap,.pcapng,application/json,text/csv,application/vnd.tcpdump.pcap" hidden onChange={onFileChosen} aria-label="Choose evidence files" />
+      <input ref={inputRef} type="file" accept="audio/*,video/*,.json,.csv,.pcap,.pcapng,.mp3,.wav,.m4a,.aac,.flac,.ogg,.opus,.mp4,.mov,.mkv,.webm,.avi,.m4v,application/json,text/csv,application/vnd.tcpdump.pcap" hidden onChange={onFileChosen} aria-label="Choose evidence files" />
       <button className="upload-btn" onClick={() => inputRef.current?.click()} aria-label="Choose files for upload">Choose Files</button>
       {isUploading ? <div className="progress" aria-label="Upload progress"><span style={{ width: `${progress}%` }} /></div> : null}
       {uploadStatus ? <p className="state-text">{uploadStatus}</p> : null}
